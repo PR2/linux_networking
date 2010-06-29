@@ -301,10 +301,6 @@ static void wpa_supplicant_scan(void *eloop_ctx, void *timeout_ctx)
 		wpa_supplicant_event(wpa_s, EVENT_SCAN_RESULTS, NULL);
 		return;
 	}
-        else
-        {
-		wpa_printf(MSG_DEBUG, "**** No cigar! %i %i %i %i %i %i", wpa_s->scan_res_tried, wpa_s->conf->ap_scan, !(wpa_s->drv_flags & WPA_DRIVER_FLAGS_USER_SPACE_MLME), wps, !wpa_s->conf->filter_ssids, !wpa_s->connect_without_scan);
-        }
 
 	scan_req = wpa_s->scan_req;
 	wpa_s->scan_req = 0;
