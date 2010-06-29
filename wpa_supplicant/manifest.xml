@@ -1,0 +1,12 @@
+<package>
+  <description brief="wpa_supplicant for multi_interface_roam">
+     A version of wpa_supplicant that has been modified to work with
+     multi_interface_roam.
+  </description>
+  <author>Package maintained by Blaise Gassend</author>
+  <license>GPL</license>
+  <review status="unreviewed" notes=""/>
+  <url>http://ros.org/wiki/wpa_supplicant</url>
+</package>
+
+
