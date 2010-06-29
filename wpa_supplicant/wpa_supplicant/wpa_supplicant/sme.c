@@ -429,8 +429,23 @@ void sme_event_assoc_reject(struct wpa_supplicant *wpa_s,
 void sme_event_auth_timed_out(struct wpa_supplicant *wpa_s,
 			      union wpa_event_data *data)
 {
-	wpa_printf(MSG_DEBUG, "SME: Authentication timed out");
-	wpa_supplicant_req_scan(wpa_s, 5, 0);
+	int timeout = 5000;
+	
+        wpa_printf(MSG_DEBUG, "SME: Authentication timed out");
+	
+        if (wpa_blacklist_add(wpa_s, wpa_s->pending_bssid) == 0) {
+		struct wpa_blacklist *b;
+		b = wpa_blacklist_get(wpa_s, wpa_s->pending_bssid);
+		if (b && b->count < 3) {
+			/*
+			 * Speed up next attempt if there could be other APs
+			 * that could accept association.
+			 */
+			timeout = 100;
+		}
+	}
+	wpa_supplicant_req_scan(wpa_s, timeout / 1000,
+				1000 * (timeout % 1000));
 }
 
 

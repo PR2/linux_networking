@@ -944,6 +944,7 @@ static void wpa_supplicant_event_scan_results(struct wpa_supplicant *wpa_s,
 
 	if (selected) {
 		int skip;
+                wpa_s->more_bss_to_try = 1;
 		skip = !wpa_supplicant_need_to_roam(wpa_s, selected, ssid,
 						    scan_res);
 		wpa_scan_results_free(scan_res);
@@ -951,6 +952,7 @@ static void wpa_supplicant_event_scan_results(struct wpa_supplicant *wpa_s,
 			return;
 		wpa_supplicant_connect(wpa_s, selected, ssid);
 	} else {
+                wpa_s->more_bss_to_try = 0;
 		wpa_scan_results_free(scan_res);
 		wpa_printf(MSG_DEBUG, "No suitable network found");
 		ssid = wpa_supplicant_pick_new_network(wpa_s);

@@ -368,6 +368,7 @@ struct wpa_supplicant {
 	int scanning;
 	int new_connection;
 	int reassociated_connection;
+        int more_bss_to_try;
 
 	int eapol_received; /* number of EAPOL packets received after the
 			     * previous association event */
