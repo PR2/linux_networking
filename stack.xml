@@ -1,0 +1,12 @@
+<stack>
+  <description brief="Tools to work with linux networking">
+    <p>
+      Tools to work with linux networking. 
+    </p>
+  </description>
+  <author>Maintained by Blaise Gassend</author>
+  <license></license>  
+  <review status="unreviewed" notes=""/>
+  <url>http://ros.org/wiki/linux_networking</url>
+  <depend stack="ros" />
+</stack>
