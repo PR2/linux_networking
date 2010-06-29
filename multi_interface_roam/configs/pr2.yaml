@@ -1,0 +1,18 @@
+redirect_console: True
+wireless_namespace: 'ddwrt'
+wpa_config: "/etc/ros/wifi/networks.conf" 
+base_station: "basestation-novpn"
+ping_port: 1194
+tunnel_interface: 'tun9'
+local_networks: [ '10.68.0.0/24', '10.69.0.0/24', '192.168.1.1' ]
+
+interfaces:
+#  wlan0: { type: wireless }
+  wlan1: { type: wireless }
+#  wlan2: { type: wireless }
+#  ra0: { type: wireless }
+#  ra1: { type: wireless }
+#  wan0: { type: wired,  priority: 20 }
+#  lan3: { type: wired, priority: 10 }
+#  "basestation-novpn@lan0": { type: static, name: bs1 }
+#  "192.168.1.1@lan0:1": { type: static, name: bs2 }

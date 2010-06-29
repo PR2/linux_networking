@@ -1,0 +1,25 @@
+<package>
+  <description brief="Roaming with multiple network interfaces.">
+    <p>
+    This package allows automatic configuration and switching between 
+    multiple network interfaces. It can be used in combination with a VPN
+    tunnel to achieve seamless wifi roaming, and near-instantaneous
+    transitioning between multiple available network interfaces.
+  </p>
+  <p>
+    Currently only wifi interfaces are supported.
+  </p>
+  </description>
+  <author>Blaise Gassend</author>
+  <license>BSD</license>
+  <review status="unreviewed" notes=""/>
+  <url>http://ros.org/wiki/multi_interface_roam</url>
+  <depend package="rospy"/>
+  <depend package="network_monitor_udp"/>
+  <depend package="std_msgs"/>
+  <depend package="diagnostic_msgs"/>
+  <depend package="pr2_msgs"/>
+
+</package>
+
+
