@@ -25,6 +25,7 @@ class MonitorClient:
         self.exiting = False
         self.sourceaddr = self.resolve_addr(sourceaddr)
         self.destaddr = destaddr
+        self.exceptions = set()
         try:
             self.destaddr = self.resolve_addr(self.destaddr)
         except:
@@ -81,7 +82,7 @@ class MonitorClient:
          self.bins = [0 for i in range(0,len(self.latencybins))]
 
     def shutdown(self):
-        print "Udp monitor starting to shut down"
+        #print "Udp monitor starting to shut down"
         self.exiting = True
         with self.cv:
            self.cv.notify_all()
@@ -93,7 +94,7 @@ class MonitorClient:
             try:
                 sleeptime = next_time - time.time()
                 if (sleeptime < -1):
-                    print >> sys.stderr, "Send thread too far behind. Resetting expectations."
+                    self.exceptions.add("Send thread too far behind. Resetting expectations.")
                     next_time = time.time()
                 elif sleeptime > 0:
                     time.sleep(sleeptime)
@@ -114,10 +115,11 @@ class MonitorClient:
                     continue # This will count as a dropped packet. 
                 self.socket.sendto(hdr.ljust(self.pkt_length), self.destaddr)
             except Exception, e:
-                print "Got exception in send thread:", e
-                traceback.print_exc(10)
-                print self.destaddr
-        print "Udp monitor send_thread finished shut down"
+                self.exceptions.add(str(e))
+                #print "Got exception in send thread:", e
+                #traceback.print_exc(10)
+                #print self.destaddr
+        #print "Udp monitor send_thread finished shut down"
 
     def recv_thread_entry(self):
         while not self.exiting:
@@ -142,7 +144,7 @@ class MonitorClient:
                     self.arrived.append((send_time, latency))
             except socket.timeout:
                 pass
-        print "Udp monitor recv_thread finished shut down"
+        #print "Udp monitor recv_thread finished shut down"
 
     def get_smart_bins(self, window):
         bins = [0 for i in range(0,len(self.latencybins))]
@@ -152,6 +154,10 @@ class MonitorClient:
             self.arrived = []
             outstanding = self.outstanding
             self.outstanding = {}
+            exceptions = self.exceptions
+            self.exceptions = set()
+        for s in exceptions:
+            print "Got exception", s
         window_end = now - self.latencybins[-2]
         window_start = self.window_start
         average = 0.
@@ -200,7 +206,7 @@ if __name__ == "__main__":
         else:
             src_addr = '0.0.0.0' 
         #cli = MonitorClient([.005, .01, .1, .2, .3, .4, .5], (host, int(port)), rate, size)
-        cli = MonitorClient([.005, .01, .025, .05, .075, .1], (host, int(port)), rate, size) 
+        cli = MonitorClient([.005, .01, .025, .05, .075, .1], (host, int(port)), rate, size, sourceaddr = (src_addr, 0)) 
         try:
             display_interval = 0.5
             start_time = time.time()
@@ -223,7 +229,7 @@ if __name__ == "__main__":
                 sys.stdout.flush()
         finally:
             cli.shutdown()
-            print >> sys.stderr, "Round trip latency summary (packets):", 
+            print >> sys.stderr, "Round trip latency summary (packets):" 
             for i in range(0, len(cli.latencybins)):
                 print >> sys.stderr, "%.1f ms: %i before %i after"%(cli.latencybins[i] * 1000, sum(cli.bins[0:i+1]), sum(cli.bins[i+1:]) + cli.lost)
 
