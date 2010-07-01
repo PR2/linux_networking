@@ -4,11 +4,10 @@
 # - Mark on ping packets in not being used.
 # - Most gateway packets should go through the tunnel.
 # - Are we black-holing packets properly when there is nowhere to send them?
-# - Address tends to get set twice.
-# - If you kill multi_interface_roam, on startup it.
 # - We could trigger a restrategize as soon as a link goes away.
 # - Need to add priorities to different interfaces (wan better than 610n on
 # pr2)
+# - Refactor so that the link/address state machine is cleaner.
 # 
 
 import subprocess
@@ -256,7 +255,7 @@ class CommandWithOutput(threading.Thread):
 class WpaSupplicant(CommandWithOutput):
     def __init__(self, iface, config):
         self.iface = iface
-        CommandWithOutput.__init__(self, ['wpa_supplicant', '-i', iface, '-c', config, '-C', '/var/run/wpa_supplicant', '-dd'], "wpa_supplicant_"+iface)
+        CommandWithOutput.__init__(self, ['rosrun', 'wpa_supplicant', 'wpa_supplicant', '-i', iface, '-c', config, '-C', '/var/run/wpa_supplicant', '-dd'], "wpa_supplicant_"+iface)
 
     def got_line(self, line):
         pass
@@ -379,7 +378,7 @@ class NetlinkMonitor(CommandWithOutput):
                         if self.cur_iface in self.link_callbacks:
                             for callback in self.link_callbacks[self.cur_iface]:
                                 callback(link_state)
-                        #print "********************Link change", self.cur_iface, link_state # FIXME Remove this.
+                        print "********************Link change", self.cur_iface, link_state # FIXME Remove this.
                     #else:
                     #    print "********************No link change", self.cur_iface, link_state
                 except ValueError:
@@ -501,7 +500,12 @@ class StaticRoute(NetworkConnection):
         flushiprule(self.tableid)
         System("ip rule add priority %i from %s table %i"%(self.tableid,addr,self.tableid))
         System("ip route flush table %i"%self.tableid)
-        gatewayip = socket.gethostbyname(self.gateway)
+        try:
+            gatewayip = socket.gethostbyname(self.gateway)
+        except socket.gaierror, e:
+            # TODO Should I bail out at this point?
+            print >> sys.stderr, "Error resolving gateway host %s. Connection self.name will not work."%self.gateway
+            return
         System("ip route add table %i default dev %s via %s src %s"%(self.tableid, self.iface, gatewayip, addr))
         System("ip route add table %i %s dev %s src %s"%(self.tableid, gatewayip, self.iface, addr))
                     
@@ -633,8 +637,17 @@ class WirelessInterface(DhcpInterface):
         self.wifi = pythonwifi.iwlibs.Wireless(iface)
         self.iwinfo = pythonwifi.iwlibs.WirelessInfo(iface)
         
-        netlink_monitor.register_link(iface, self.linkchange)
         self.supplicant = WpaSupplicant(iface, config['wpa_config'])
+        self.initialized = True
+        netlink_monitor.register_link(iface, self.linkchange)
+    
+    def linkchange(self, up):
+        if not self.initialized:
+            return
+        if self.status == NOLINK and up:
+            self.supplicant.command('reassociate')
+            print "************** reassociate"
+        DhcpInterface.linkchange(self, up)
     
     def update(self):
         self.update1()
@@ -738,15 +751,13 @@ class WirelessInterface(DhcpInterface):
 class WiredInterface(DhcpInterface):
     def __init__(self, iface, config, tableid, pingtarget):
         self.initialized = False
-        self.last_link_status = None
         DhcpInterface.__init__(self, iface, config, tableid, pingtarget)
-        netlink_monitor.register_link(iface, self.linkchange)
         self.initialized = True
+        netlink_monitor.register_link(iface, self.linkchange)
     
     def linkchange(self, up):
-        if up != self.last_link_status and self.initialized:
+        if up != (self.status != NOLINK) and self.initialized:
             os.system('beep')
-        self.last_link_status = up
         DhcpInterface.linkchange(self, up)
     
     def update(self):

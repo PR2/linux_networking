@@ -1,7 +1,8 @@
 #! /bin/bash
 
+HOME=/root
 . /etc/ros/setup.bash
-rospack profile
+rospack profile > /dev/null
 
 ############### EDIT ME ##################
 
@@ -25,7 +26,7 @@ RUN_AS=root
 
 PID_FILE=/var/run/multi_interface_roam.pid
 
-ENABLED=0
+ENABLED=1
 
 ############### END EDIT ME ##################
 
