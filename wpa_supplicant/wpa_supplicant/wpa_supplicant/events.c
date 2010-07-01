@@ -960,7 +960,7 @@ static void wpa_supplicant_event_scan_results(struct wpa_supplicant *wpa_s,
 			wpa_printf(MSG_DEBUG, "Setup a new network");
 			wpa_supplicant_associate(wpa_s, NULL, ssid);
 		} else {
-			int timeout_sec = 5;
+			int timeout_sec = 1;
 			int timeout_usec = 0;
 			wpa_supplicant_req_new_scan(wpa_s, timeout_sec,
 						    timeout_usec);
@@ -1312,18 +1312,18 @@ static void wpa_supplicant_event_disassoc(struct wpa_supplicant *wpa_s,
 	wpa_supplicant_mark_disassoc(wpa_s);
 	bgscan_deinit(wpa_s);
 #ifdef CONFIG_SME
-	if (authenticating &&
-	    (wpa_s->drv_flags & WPA_DRIVER_FLAGS_SME)) {
-		/*
-		 * mac80211-workaround to force deauth on failed auth cmd,
-		 * requires us to remain in authenticating state to allow the
-		 * second authentication attempt to be continued properly.
-		 */
-		wpa_printf(MSG_DEBUG, "SME: Allow pending authentication to "
-			   "proceed after disconnection event");
-		wpa_supplicant_set_state(wpa_s, WPA_AUTHENTICATING);
-		os_memcpy(wpa_s->pending_bssid, prev_pending_bssid, ETH_ALEN);
-	}
+//	if (authenticating &&
+//	    (wpa_s->drv_flags & WPA_DRIVER_FLAGS_SME)) {
+//		/*
+//		 * mac80211-workaround to force deauth on failed auth cmd,
+//		 * requires us to remain in authenticating state to allow the
+//		 * second authentication attempt to be continued properly.
+//		 */
+//		wpa_printf(MSG_DEBUG, "SME: Allow pending authentication to "
+//			   "proceed after disconnection event");
+//		wpa_supplicant_set_state(wpa_s, WPA_AUTHENTICATING);
+//		os_memcpy(wpa_s->pending_bssid, prev_pending_bssid, ETH_ALEN);
+//	}
 #endif /* CONFIG_SME */
 }
 
