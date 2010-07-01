@@ -8,7 +8,7 @@
 # - Need to add priorities to different interfaces (wan better than 610n on
 # pr2)
 # - Refactor so that the link/address state machine is cleaner.
-# 
+# - Make sure we don't crash if logging fails.
 
 import subprocess
 import os
@@ -255,7 +255,8 @@ class CommandWithOutput(threading.Thread):
 class WpaSupplicant(CommandWithOutput):
     def __init__(self, iface, config):
         self.iface = iface
-        CommandWithOutput.__init__(self, ['rosrun', 'wpa_supplicant', 'wpa_supplicant', '-i', iface, '-c', config, '-C', '/var/run/wpa_supplicant', '-dd'], "wpa_supplicant_"+iface)
+        script = os.path.join(os.path.dirname(__file__), 'wpa_supplicant.sh')
+        CommandWithOutput.__init__(self, [script, '-i', iface, '-c', config, '-C', '/var/run/wpa_supplicant', '-dd'], "wpa_supplicant_"+iface)
 
     def got_line(self, line):
         pass
@@ -644,9 +645,9 @@ class WirelessInterface(DhcpInterface):
     def linkchange(self, up):
         if not self.initialized:
             return
-        if self.status == NOLINK and up:
-            self.supplicant.command('reassociate')
-            print "************** reassociate"
+        # if self.status == NOLINK and up:
+        #     self.supplicant.command('reassociate')
+        #     print "************** reassociate"
         DhcpInterface.linkchange(self, up)
     
     def update(self):
@@ -928,13 +929,32 @@ class NetworkSelector:
         safe_shutdown(self.routing_rules.shutdown)
 
     def make_active(self, iface):
-        # FIXME Really need both?
+        if not iface:
+            self.active = -1
+            return
+        self.make_active_multiple([iface])
+
+    def make_active_non_tunnel(self, iface):
+        if not iface:
+            self.active = -1
+            return
+        
         self.active_iface = self.interface_names.index(iface.name)
-        if iface is not None:
-            System("ip rule add priority %i table %i fwmark 1"%(TUNNEL_RULE2,iface.tableid))
-            System("ip rule add priority %i table %i to %s"%(TUNNEL_RULE,iface.tableid,self.base_station))
-            System("ip rule del priority %i"%TUNNEL_RULE2)
-            System("ip rule del priority %i"%TUNNEL_RULE)
+        System("ip rule add priority %i table %i"%(TUNNEL_RULE,iface.tableid))
+        System("ip rule del priority %i"%TUNNEL_RULE)
+
+    def make_active_multiple(self, iface):
+        n = len(iface)
+        if not n:
+            self.active_iface = -1
+            return
+        
+        self.active_iface = self.interface_names.index(iface[0].name)
+        for i in range(0, n):
+            System("ip rule add priority %i table %i to %s"%(TUNNEL_RULE+i,iface[i].tableid,self.base_station))
+            System("ip rule del priority %i"%(TUNNEL_RULE+i))
+            #System("ip rule add priority %i table %i fwmark 1"%(TUNNEL_RULE2,iface.tableid))
+            #System("ip rule del priority %i"%TUNNEL_RULE2)
 
 class SelectionStrategy:
     def __init__(self, config):
