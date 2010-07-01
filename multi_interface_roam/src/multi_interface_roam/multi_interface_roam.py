@@ -145,6 +145,7 @@ class RunCommand:
 
 class CommandWithOutput(threading.Thread):
     def __init__(self, args, name):
+        self.restart_delay = 0.2
         threading.Thread.__init__(self, name = name)
         #logname = os.path.join(logdir, '%s.log'%name)
         #try:
@@ -189,7 +190,11 @@ class CommandWithOutput(threading.Thread):
                 (rd, wr, err) = select.select([self.proc.stdout], [], [], 0.2)
                 if not self.running:
                     #print "Exiting CommandWithOutput", self.proc.pid, self.proc_args
-                    self.proc.send_signal(signal.SIGINT)
+                    try:
+                        self.proc.send_signal(signal.SIGINT)
+                    except OSError, e:
+                        if str(e).find('[Errno 3]') == -1:
+                            raise
                     #print "Starting Communicate", self.proc_args
                     try:
                         self.proc.communicate()
@@ -207,7 +212,7 @@ class CommandWithOutput(threading.Thread):
                     if len(newdata) == 0: 
                         self.proc.kill()
                         self.proc.communicate()
-                        time.sleep(0.2)
+                        time.sleep(self.restart_delay)
                         if not self.running: 
                             return
                         self.console_logger.info("Process died, restarting: %s"%(" ".join(self.proc_args)))
@@ -257,12 +262,21 @@ class WpaSupplicant(CommandWithOutput):
         self.iface = iface
         script = os.path.join(os.path.dirname(__file__), 'wpa_supplicant.sh')
         CommandWithOutput.__init__(self, [script, '-i', iface, '-c', config, '-C', '/var/run/wpa_supplicant', '-dd'], "wpa_supplicant_"+iface)
+        self.restart_delay = 1
 
     def got_line(self, line):
         pass
 
     def command(self, cmd):
         System('wpa_cli -p /var/run/wpa_supplicant -i %s %s'%(self.iface, cmd))
+    
+    def restart(self):
+        print >> sys.stderr, "Restarting supplicant on %s"%self.iface
+        try:
+            self.proc.send_signal(signal.SIGINT) 
+        except OSError, e:
+            if str(e).find('[Errno 3]') == -1:
+                raise
 
 class DhcpClient(CommandWithOutput):
     def __init__(self, iface, bound_callback = None, deconfig_callback = None, leasefail_callback = None):
@@ -272,6 +286,7 @@ class DhcpClient(CommandWithOutput):
         self.leasefail_callback = leasefail_callback
         script = os.path.join(os.path.dirname(__file__), 'udhcpc_echo.sh')
         CommandWithOutput.__init__(self, ['udhcpc', '-s', script, '-i', iface, '-f'], "udhcpc_"+iface)
+        self.restart_delay = 0
   
     def got_line(self, line):
         boundprefix = "UDHCPC: bound "
@@ -633,6 +648,8 @@ class DhcpInterface(NetworkConnection):
            
 class WirelessInterface(DhcpInterface):
     def __init__(self, iface, config, tableid, pingtarget):
+        self.startover_count = 0
+        
         DhcpInterface.__init__(self, iface, config, tableid, pingtarget)
 
         self.wifi = pythonwifi.iwlibs.Wireless(iface)
@@ -645,10 +662,22 @@ class WirelessInterface(DhcpInterface):
     def linkchange(self, up):
         if not self.initialized:
             return
+        
+        if up:
+            self.startover_count = 0
         # if self.status == NOLINK and up:
         #     self.supplicant.command('reassociate')
         #     print "************** reassociate"
         DhcpInterface.linkchange(self, up)
+
+    def startover(self):
+        if self.startover_count > 1:
+            self.startover_count = 0
+            self.supplicant.restart()
+        else:
+            self.startover_count += 1
+
+        DhcpInterface.startover(self)  
     
     def update(self):
         self.update1()
@@ -657,8 +686,9 @@ class WirelessInterface(DhcpInterface):
             self.essid = self.wifi.getEssid()
             self.diags.append(('ESSID', self.essid))
         except Exception, e:
-            traceback.print_exc(10)
-            print
+            if self.status != NOLINK:
+                traceback.print_exc(10)
+                print
             self.diags.append(('ESSID', 'Error collecting data.'))
             self.essid = "###ERROR-COLLECTING-DATA###"
 
@@ -666,9 +696,10 @@ class WirelessInterface(DhcpInterface):
             self.bssid = self.wifi.getAPaddr()
             self.diags.append(('BSSID', self.bssid))
         except Exception, e:
-            traceback.print_exc(10)
+            if self.status != NOLINK:
+                traceback.print_exc(10)
+                print
             self.bssid = "00:00:00:00:00:00"
-            print
             self.diags.append(('BSSID', 'Error collecting data.'))
 
         try:
@@ -676,7 +707,7 @@ class WirelessInterface(DhcpInterface):
             self.diags.append(('TX Power (mW)', self.wifi_txpower))
             self.wifi_txpower = "%.1f mW"%self.wifi_txpower
         except Exception, e:
-            if str(e).find("Operation not supported") == -1:
+            if str(e).find("Operation not supported") == -1 and self.status != NOLINK:
                 traceback.print_exc(10)
                 print
             self.diags.append(('TX Power (mW)', 'Error collecting data.'))
@@ -686,9 +717,11 @@ class WirelessInterface(DhcpInterface):
             self.wifi_frequency = self.wifi.wireless_info.getFrequency().getFrequency()
             self.diags.append(('Frequency (Gz)', "%.4f"%(self.wifi_frequency/1e9)))
         except Exception, e:
-            traceback.print_exc(10)
+            if self.status != NOLINK:
+                traceback.print_exc(10)
+                print
+            self.wifi_frequency = 0
             self.diags.append(('Frequency', 'Error collecting data.'))
-            print
 
         got_stats = False
         if self.status != NOLINK:
