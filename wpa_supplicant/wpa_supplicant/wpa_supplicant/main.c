@@ -129,6 +129,8 @@ int main(int argc, char *argv[])
 	struct wpa_params params;
 	struct wpa_global *global;
 
+        setlinebuf(stdout);
+
 	if (os_program_init())
 		return -1;
 
