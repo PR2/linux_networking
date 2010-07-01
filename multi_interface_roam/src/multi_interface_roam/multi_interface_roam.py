@@ -8,7 +8,7 @@
 # - Need to add priorities to different interfaces (wan better than 610n on
 # pr2)
 # - Refactor so that the link/address state machine is cleaner.
-# - Make sure we don't crash if logging fails.
+# - Make sure we don't crash if logging fail.
 
 import subprocess
 import os
@@ -809,7 +809,7 @@ class RoutingRules:
             System("ip rule add priority %i to %s lookup main"%(LOCAL_RULE, net))
         System("ip rule add priority %i lookup %i"%(DEFAULT_RULE,DEFAULT_RULE))
         #System("ip rule add priority %i blackhole fwmark 1"%(TUNNEL_RULE2))
-        System("ip rule add priority %i blackhole fwmark 1"%(TUNNEL_RULE))
+        #System("ip rule add priority %i blackhole fwmark 1"%(TUNNEL_RULE))
         netlink_monitor.register_link(self.tuniface, self.refresh)
 
     def refresh(self, up): # Call this often in case an interface goes away for a bit.
@@ -820,9 +820,9 @@ class RoutingRules:
         # Make sure that all the rules from an earlier run are flushed out.
         for i in range(0,self.numinterfaces):
             flushiprule(FIRST_IFACE_RULE + i)
+            flushiprule(TUNNEL_RULE + i)
         flushiprule(DEFAULT_RULE)
         flushiprule(LOCAL_RULE)
-        flushiprule(TUNNEL_RULE)
         #flushiprule(TUNNEL_RULE2)
         #flushiprule(BLOCK_TUNNEL_RULE, True)
         #flushiprule(BLOCK_NON_TUNNEL_RULE, True)
@@ -868,6 +868,8 @@ class NetworkSelector:
         self.routing_rules = RoutingRules(len(interfaces_config), local_networks, self.tunnel_interface)
         self.interfaces = []
         self.active_iface = -1
+        self._tunnel_rules = {}
+        self._set_tunnel_rule(TUNNEL_RULE, "blackhole")
 
         i = -1
         for iface in interfaces_config:
@@ -934,14 +936,19 @@ class NetworkSelector:
             return
         self.make_active_multiple([iface])
 
+    def _set_tunnel_rule(self, priority, rule):
+        System("ip rule add priority %i %s"%(priority, rule))
+        if priority in self._tunnel_rules:
+            System("ip rule del priority %i %s"%(priority, self._tunnel_rules[priority]))
+        self._tunnel_rules[priority] = rule
+
     def make_active_non_tunnel(self, iface):
         if not iface:
             self.active = -1
             return
         
         self.active_iface = self.interface_names.index(iface.name)
-        System("ip rule add priority %i table %i"%(TUNNEL_RULE,iface.tableid))
-        System("ip rule del priority %i"%TUNNEL_RULE)
+        self._set_tunnel_rule(TUNNEL_RULE,"table %i"%iface.tableid)
 
     def make_active_multiple(self, iface):
         n = len(iface)
@@ -951,8 +958,7 @@ class NetworkSelector:
         
         self.active_iface = self.interface_names.index(iface[0].name)
         for i in range(0, n):
-            System("ip rule add priority %i table %i to %s"%(TUNNEL_RULE+i,iface[i].tableid,self.base_station))
-            System("ip rule del priority %i"%(TUNNEL_RULE+i))
+            self._set_tunnel_rule(TUNNEL_RULE+i,"table %i to %s"%(iface[i].tableid, self.base_station))
             #System("ip rule add priority %i table %i fwmark 1"%(TUNNEL_RULE2,iface.tableid))
             #System("ip rule del priority %i"%TUNNEL_RULE2)
 
@@ -1045,23 +1051,27 @@ class LinkStabilityTimeMeasurementStrategy(SelectionStrategy):
 class SimpleSelectionStrategy(SelectionStrategy):
     def __init__(self, config):
         SelectionStrategy.__init__(self, config)
+        try:
+            self.reliability_thresh = config['reliability_threshold']
+        except:
+            self.reliability_thresh = 90
 
     def do_update(self):
         ns = self.ns
-        # Update metrics
-        goodnesses = [ i.goodness for i in ns.interfaces ]
-        reliabilities = [ i.reliability for i in ns.interfaces ]
-        priorities = [ i.priority for i in ns.interfaces ]
-
-        # Pick new active interface
-        sort_param = [ sum(tuple) for tuple in zip(goodnesses, reliabilities, priorities) ]
-        best_sort_param = max(sort_param)
-        best_iface = sort_param.index(best_sort_param)
-        if goodnesses[best_iface] < 0:
-            ns.active_iface = -1
-        elif best_iface != ns.active_iface:
-            ns.active_iface = best_iface
-            ns.make_active(ns.interfaces[ns.active_iface])
+        # Get a sorted list of working interfaces.
+        iface_with_sort_param = []
+        for i in ns.interfaces:
+            if i.goodness <= 0:
+                continue
+            sort_param = i.goodness + i.reliability + i.priority
+            iface_with_sort_param.append((i, sort_param))
+        if iface_with_sort_param:
+            iface_with_sort_param.sort(key = lambda tuple: tuple[1], reverse = True)
+            iface_sorted, _ = zip(*iface_with_sort_param)
+        else:
+            iface_sorted = []
+        
+        ns.make_active_multiple(iface_sorted)
 
         # Decide if the other interfaces should go down
         for i in range(0,len(ns.interfaces)):
@@ -1072,7 +1082,7 @@ class SimpleSelectionStrategy(SelectionStrategy):
                 if interface.goodness > 0:
                     # Do not reset the active connection if it is slightly alive.
                     interface.increase_timeout()
-            elif interface.reliability < 90 or interface.goodness < 50:
+            elif interface.reliability < self.reliability_thresh or interface.goodness < 50:
                 # Restart unreliable non-active connections.
                 interface.decrease_timeout(3)
             else:
@@ -1081,9 +1091,13 @@ class SimpleSelectionStrategy(SelectionStrategy):
 
         # Print active_iface status
         for iface in ns.interfaces:
-            if ns.active_iface != -1 and iface == ns.interfaces[ns.active_iface]:
-                is_active = "active"
-            else:
+            try:
+                rank = iface_sorted.index(iface) + 1
+                if rank == 1:
+                    is_active = "active"
+                else:
+                    is_active = "#%i"%rank
+            except ValueError:
                 is_active = ""
             print >> strategy_str, "%10s %5.1f %17s %7.3f %3.0f %s"%(iface.name, (iface.timeout_time - time.time()), iface.bssid, iface.goodness, iface.reliability, is_active)
 
