@@ -1083,6 +1083,7 @@ class LinkStabilityTimeMeasurementStrategy(SelectionStrategy):
 
 class SimpleSelectionStrategy(SelectionStrategy):
     def __init__(self, config):
+        self.best_wireless = -1
         SelectionStrategy.__init__(self, config)
         try:
             self.reliability_thresh = config['reliability_threshold']
@@ -1096,7 +1097,12 @@ class SimpleSelectionStrategy(SelectionStrategy):
         for i in ns.interfaces:
             if i.goodness <= 0:
                 continue
-            sort_param = i.goodness + i.reliability + i.priority
+            bonus = 0
+            if i == ns.interfaces[self.best_wireless]:
+                bonus += 10
+            if i == ns.interfaces[ns.active_iface]:
+                bonus += 10
+            sort_param = i.goodness + i.reliability + i.priority + bonus
             iface_with_sort_param.append((i, sort_param))
         if iface_with_sort_param:
             iface_with_sort_param.sort(key = lambda tuple: tuple[1], reverse = True)
@@ -1106,12 +1112,23 @@ class SimpleSelectionStrategy(SelectionStrategy):
         
         ns.make_active_multiple(iface_sorted)
 
+        # Figure out the best wireless interface
+        iface_types = map(lambda x: x.__class__, iface_sorted)
+        try:
+            wireless_index = iface_types.index(WirelessInterface)
+            self.best_wireless = ns.interfaces.index(iface_sorted[wireless_index])
+        except:
+            self.best_wireless = -1
+        
+        print self.best_wireless
+        print iface_types
+
         # Decide if the other interfaces should go down
         for i in range(0,len(ns.interfaces)):
             interface = ns.interfaces[i]
             if interface.goodness < 0: 
                 pass # Card not configured, we are not in charge.
-            elif i == ns.active_iface:
+            elif i == self.best_wireless:
                 if interface.goodness > 0:
                     # Do not reset the active connection if it is slightly alive.
                     interface.increase_timeout()
@@ -1130,6 +1147,8 @@ class SimpleSelectionStrategy(SelectionStrategy):
                     is_active = "active"
                 else:
                     is_active = "#%i"%rank
+                if self.best_wireless != -1 and iface == ns.interfaces[self.best_wireless]:
+                    is_active += ", best wifi"
             except ValueError:
                 is_active = ""
             print >> strategy_str, "%10s %5.1f %17s %7.3f %3.0f %s"%(iface.name, (iface.timeout_time - time.time()), iface.bssid, iface.goodness, iface.reliability, is_active)
