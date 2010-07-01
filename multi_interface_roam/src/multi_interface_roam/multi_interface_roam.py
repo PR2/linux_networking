@@ -1120,9 +1120,6 @@ class SimpleSelectionStrategy(SelectionStrategy):
         except:
             self.best_wireless = -1
         
-        print self.best_wireless
-        print iface_types
-
         # Decide if the other interfaces should go down
         for i in range(0,len(ns.interfaces)):
             interface = ns.interfaces[i]
