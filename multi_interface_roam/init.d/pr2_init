@@ -26,7 +26,11 @@ RUN_AS=root
 
 PID_FILE=/var/run/multi_interface_roam.pid
 
-ENABLED=1
+if [ -e /etc/slave ]; then
+  ENABLED=0
+else
+  ENABLED=1
+fi
 
 ############### END EDIT ME ##################
 
