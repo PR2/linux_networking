@@ -5,6 +5,7 @@ base_station: "basestation-novpn"
 ping_port: 1194
 tunnel_interface: 'tun9'
 local_networks: [ '10.68.0.0/24', '10.69.0.0/24' ]
+reliability_threshold: 50
 
 interfaces:
   wlan0: { type: wireless }
