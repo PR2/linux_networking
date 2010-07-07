@@ -522,7 +522,7 @@ class StaticRoute(NetworkConnection):
             # TODO Should I bail out at this point?
             print >> sys.stderr, "Error resolving gateway host %s. Connection self.name will not work."%self.gateway
             return
-        System("ip route add table %i default dev %s via %s src %s"%(self.tableid, self.iface, gatewayip, addr))
+        System("ip route add table %i default dev %s via %s src %s onlink"%(self.tableid, self.iface, gatewayip, addr))
         System("ip route add table %i %s dev %s src %s"%(self.tableid, gatewayip, self.iface, addr))
                     
     def linkchange(self, up):
@@ -586,7 +586,7 @@ class DhcpInterface(NetworkConnection):
         #System("ip rule add priority %i from %s table %i fwmark 2"%(self.tableid,ip,self.tableid))
         System("ip rule add priority %i from %s table %i"%(self.tableid,addr,self.tableid))
         System("ip route flush table %i"%self.tableid)
-        System("ip route add table %i default dev %s via %s src %s"%(self.tableid, self.iface, self.gateway, addr))
+        System("ip route add table %i default dev %s via %s src %s onlink"%(self.tableid, self.iface, self.gateway, addr))
         net = ipaddr.IPv4Network("%s/%s"%(addr,netbits))
         #self.network = "%s/%s"%(net.network,net.prefixlen)
         print("ip route add table %i %s/%s dev %s src %s"%(self.tableid, net.network, net.prefixlen, self.iface, addr))
@@ -1094,14 +1094,18 @@ class SimpleSelectionStrategy(SelectionStrategy):
         ns = self.ns
         # Get a sorted list of working interfaces.
         iface_with_sort_param = []
+        best_bssid = ns.interfaces[self.best_wireless].bssid if self.best_wireless != -1 else None
         for i in ns.interfaces:
             if i.goodness <= 0:
                 continue
             bonus = 0
-            if i == ns.interfaces[self.best_wireless]:
-                bonus += 10
-            if i == ns.interfaces[ns.active_iface]:
-                bonus += 10
+            if self.best_wireless != -1:
+                if i == ns.interfaces[self.best_wireless]:
+                    bonus += 5
+                elif i.bssid != best_bssid:
+                    bonus -= 5
+            #if i == ns.interfaces[ns.active_iface]:
+            #    bonus += 10
             sort_param = i.goodness + i.reliability + i.priority + bonus
             iface_with_sort_param.append((i, sort_param))
         if iface_with_sort_param:
