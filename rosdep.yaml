@@ -6,3 +6,6 @@ libnl-dev:
 
 libreadline-dev:
   ubuntu: libreadline-dev
+
+udhcpc:
+  ubuntu: udhcpc
