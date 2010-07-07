@@ -1,0 +1,8 @@
+libpcsclite-dev:
+  ubuntu: libpcsclite-dev
+
+libnl-dev:
+  ubuntu: libnl-dev
+
+libreadline-dev:
+  ubuntu: libreadline6-dev
