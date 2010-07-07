@@ -4,8 +4,14 @@ import rospy
 import std_msgs.msg
 import roslib.masterapi
 
-import rospy.masterslave
-import rospy.registration
+try:
+    import rospy.masterslave as masterslave
+except:
+    import rospy.impl.masterslave as masterslave
+try:
+    import rospy.registration as registration
+except:
+    import rospy.impl.registration as registration
 
 master_check_interval = 2
 
@@ -48,7 +54,7 @@ def check_master():
                 master_pid = None
 
 def new_registration_reg_added(self, resolved_name, data_type_or_uri, reg_type):
-    if reg_type == rospy.registration.Registration.PUB:
+    if reg_type == registration.Registration.PUB:
         pub_list[resolved_name] = data_type_or_uri
         try:
             master.registerPublisher(resolved_name, data_type_or_uri, our_uri)
@@ -61,8 +67,8 @@ original_Publisher_publish = rospy.Publisher.publish
 original_rospy_init_node = rospy.init_node
 
 # hot patch
-rospy.masterslave.ROSHandler._is_registered = lambda x: True
-rospy.registration.RegManager.reg_added = new_registration_reg_added
+masterslave.ROSHandler._is_registered = lambda x: True
+registration.RegManager.reg_added = new_registration_reg_added
 rospy.Publisher.publish = new_publish
 rospy.init_node = new_init_node
 
