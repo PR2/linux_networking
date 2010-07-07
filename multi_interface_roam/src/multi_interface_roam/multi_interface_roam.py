@@ -9,6 +9,7 @@
 # pr2)
 # - Refactor so that the link/address state machine is cleaner.
 # - Make sure we don't crash if logging fail.
+# - Add error checking to logging.
 
 import subprocess
 import os
@@ -77,6 +78,10 @@ class LoggerStream:
 
 logdir = '/var/log/roam'
 
+try:
+    os.makedirs(logdir)
+except:
+    pass
 logfilecount = 10
 
 file_formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
