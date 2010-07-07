@@ -5,4 +5,4 @@ libnl-dev:
   ubuntu: libnl-dev
 
 libreadline-dev:
-  ubuntu: libreadline6-dev
+  ubuntu: libreadline-dev
