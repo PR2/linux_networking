@@ -8,9 +8,11 @@
   <review status="unreviewed" notes=""/>
   <url>http://ros.org/wiki/wpa_supplicant</url>
   <depend package="roscpp"/>
+  <depend package="actionlib_msgs"/>
   <rosdep name="libpcsclite-dev"/>
   <rosdep name="libnl-dev"/>
   <rosdep name="libreadline-dev"/>
+  <rosdep name="actionlib"/>
 </package>
 
 

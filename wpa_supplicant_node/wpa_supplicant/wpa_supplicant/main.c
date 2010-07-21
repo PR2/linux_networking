@@ -20,6 +20,7 @@
 #include "common.h"
 #include "wpa_supplicant_i.h"
 #include "driver_i.h"
+#include "../../src/nodes/wpa_supplicant_node.h"
 
 extern struct wpa_driver_ops *wpa_drivers[];
 
@@ -128,6 +129,8 @@ int main(int argc, char *argv[])
 	int iface_count, exitcode = -1;
 	struct wpa_params params;
 	struct wpa_global *global;
+
+        ros_init(&argc, char &argv);
 
         setlinebuf(stdout);
 
@@ -276,6 +279,8 @@ int main(int argc, char *argv[])
 		exitcode = wpa_supplicant_run(global);
 
 	wpa_supplicant_deinit(global);
+        
+        ros_deinit();
 
 out:
 	os_free(ifaces);
