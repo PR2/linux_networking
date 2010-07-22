@@ -34,6 +34,7 @@ struct ibss_rsn;
 struct scan_info;
 struct wpa_bss;
 struct wpa_scan_results;
+struct ros_api;
 
 /*
  * Forward declarations of private structures used within the ctrl_iface
@@ -442,6 +443,8 @@ struct wpa_supplicant {
 
 	int after_wps;
 	unsigned int wps_freq;
+
+        struct ros_api *ros_api;
 };
 
 

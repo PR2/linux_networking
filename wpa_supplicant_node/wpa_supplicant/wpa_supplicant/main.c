@@ -130,7 +130,7 @@ int main(int argc, char *argv[])
 	struct wpa_params params;
 	struct wpa_global *global;
 
-        ros_init(&argc, char &argv);
+        ros_init(&argc, &argv);
 
         setlinebuf(stdout);
 
