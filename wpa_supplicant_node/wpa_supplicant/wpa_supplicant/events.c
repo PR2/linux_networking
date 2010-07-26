@@ -940,7 +940,7 @@ static void wpa_supplicant_event_scan_results(struct wpa_supplicant *wpa_s,
 
 	wpa_supplicant_rsn_preauth_scan_results(wpa_s, scan_res);
 
-	selected = wpa_supplicant_pick_network(wpa_s, scan_res, &ssid);
+	/*selected = wpa_supplicant_pick_network(wpa_s, scan_res, &ssid);
 
 	if (selected) {
 		int skip;
@@ -965,7 +965,8 @@ static void wpa_supplicant_event_scan_results(struct wpa_supplicant *wpa_s,
 			wpa_supplicant_req_new_scan(wpa_s, timeout_sec,
 						    timeout_usec);
 		}
-	}
+	} */
+        ros_scan_completed(scan_res);
 }
 #endif /* CONFIG_NO_SCAN_PROCESSING */
 

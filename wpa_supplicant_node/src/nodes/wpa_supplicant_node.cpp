@@ -2,41 +2,94 @@
 #include <boost/thread.hpp>
 #include <actionlib/server/action_server.h>
 #include <actionlib_msgs/GoalStatus.h>
-#include <queue>
+#include <unistd.h>
+#include <fcntl.h>
+#include <queue>                  
 #include <wpa_supplicant_node/ScanAction.h>
 
 extern "C" {
 #include "includes.h"
 #include "common.h"
 #include "../../wpa_supplicant/wpa_supplicant/wpa_supplicant_i.h"
+#include "wpa_supplicant_node.h"
+#include "eloop.h"
 }
 
-typedef const boost::function<void ()> WorkFunction;
+typedef boost::function<void ()> WorkFunction;
 
 static class {
-  int eloop_pid_;
+  //int eloop_pid_;
   bool initialized_;
   std::queue<WorkFunction> work_queue_;
   boost::mutex mutex_;
+  int pipefd[2];
+  boost::shared_ptr<boost::thread> ros_spin_loop_;
+
 public:
   void doWork()
   {
+    ROS_INFO("doWork()");
+
     boost::mutex::scoped_lock(mutex_);
 
-    while (!work_queue.empty())
+    while (!work_queue_.empty())
     {
-      work_queue.pop()();
+      work_queue_.front()();
+      work_queue_.pop();
     }
   }
 
-  void addWork(WorkFunction &f)
+  void addWork(const WorkFunction &f)
   {
+    char dummy[1];
+
+    ROS_INFO("addWork()");
+    
     boost::mutex::scoped_lock(mutex_);
 
-    work_queue.enqueue(f);
-    kill(eloop_pid_, SIGALARM);
+    work_queue_.push(f);
+    if (write(pipefd[1], dummy, 1) != 1)
+      ROS_ERROR("addWork Failed to write to wakeup pipe.");
+    // FIXME Notify the event loop kill(eloop_pid_, SIGALARM);
   }
 
+  int init(int *argc, char ***argv)
+  {
+    ROS_INFO("ros_init");
+    // Register the socket that will be used to wake up the event loop.
+    if (pipe2(pipefd, O_NONBLOCK | O_CLOEXEC))
+    {
+      ROS_FATAL("pipe2 failed: %s (%i)", strerror(errno), errno);
+      return -1;
+    }
+    ROS_INFO("pipefds: %i <- %i", pipefd[0], pipefd[1]);
+    
+    ros::init(*argc, *argv, "wpa_supplicant", ros::init_options::NoSigintHandler);
+    ros_spin_loop_.reset(new boost::thread(boost::bind(&ros::spin)));
+
+    return 0;
+  }
+  
+  void init2()
+  {
+    ROS_INFO("ros_init");
+    eloop_register_read_sock(pipefd[0], &ros_do_work, NULL, NULL);
+  }
+
+  void uninit()
+  {
+    ROS_INFO("ros_deinit");
+  
+    ros::shutdown(); 
+    // FIXME Need to wait for shutdown to complete?
+  
+    if (ros_spin_loop_ && !ros_spin_loop_->timed_join((boost::posix_time::milliseconds) 2000))
+      ROS_ERROR("ROS thread did not die after two seconds. Exiting anyways. This is probably a bad sign.");
+
+    eloop_unregister_read_sock(pipefd[0]);
+    close(pipefd[0]);
+    close(pipefd[1]);
+  }
 } ros_global;
 
 typedef actionlib::ActionServer<wpa_supplicant_node::ScanAction> ScanActionServer;
@@ -60,14 +113,30 @@ public:
   {
   }
 
+  void scanCompleted(wpa_scan_results *scan_res)
+  {
+    ROS_INFO("scanCompleted");
+
+    boost::mutex::scoped_lock(mutex_);
+    
+    if (current_scan_ == ScanActionServer::GoalHandle())
+      ROS_ERROR("scanCmopleted with current_scan_ not set.");
+    else
+    {
+      current_scan_.setSucceeded();
+    }
+  }
+
 private:
   void scanGoalCallback(ScanActionServer::GoalHandle &gh)
   {
     boost::mutex::scoped_lock(mutex_);
+    
+    ROS_INFO("scanGoalCallback()");
 
-    scan_queue_.enqueue(gh);
+    scan_queue_.push(gh);
 
-    if (!current_scan_)
+    if (current_scan_ == ScanActionServer::GoalHandle())
       ros_global.addWork(boost::bind(&ros_api::scanTryActivate, this));
   }
 
@@ -79,7 +148,7 @@ private:
 
     if (current_scan_ == gh)
     {
-      ros_global.addWork(boost::bind(&ros_api::cancelScan, this, gh));
+      ros_global.addWork(boost::bind(&ros_api::scanCancel, this, gh));
     }
     else
     {
@@ -89,26 +158,31 @@ private:
     }      
   }
 
-  void scanCompleted(wpa_scan_results *scan_res)
+  void scanCancel(ScanActionServer::GoalHandle &gh)
   {
+  }
+
+  void scanTryActivate()
+  {
+    ROS_INFO("scanTryActivate()");
   }
 };
 
 extern "C" {
 
-void ros_init(int *argc, char ***argv)
+int ros_init(int *argc, char ***argv)
 {
-  ros::init(*argc, *argv, "wpa_supplicant");
-  ROS_INFO("ros_init");
-  ros_global.eloop_pid = getpid();
-  ros_global.initialized = true;
+  return ros_global.init(argc, argv);
+}
+
+void ros_init2()
+{
+  return ros_global.init2();
 }
 
 void ros_deinit()
 {
-  ROS_INFO("ros_deinit");
-  ros::shutdown(); 
-  // FIXME Need to wait for shutdown to complete?
+  ros_global.uninit();
 }
 
 void ros_add_iface(wpa_global *global, wpa_supplicant *wpa_s)
@@ -133,7 +207,9 @@ void ros_scan_completed(wpa_supplicant *wpa_s, wpa_scan_results *scan_res)
   wpa_s->ros_api->scanCompleted(scan_res);
 }
 
-void ros_do_work()
+void ros_do_work(int, void *, void *)
 {
-  ros_global->doWork();
+  ros_global.doWork();
 }
+
+} // extern "C"

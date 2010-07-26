@@ -12,6 +12,8 @@
  * See README and COPYING for more details.
  */
 
+#include <stdio.h>
+
 #include "includes.h"
 
 #include "common.h"
@@ -120,6 +122,7 @@ static void eloop_trace_sock_remove_ref(struct eloop_sock_table *table)
 
 int eloop_init(void)
 {
+        fprintf(stderr, "eloop_init\n");
 	os_memset(&eloop, 0, sizeof(eloop));
 	dl_list_init(&eloop.timeout);
 #ifdef WPA_TRACE
@@ -194,11 +197,17 @@ static void eloop_sock_table_set_fds(struct eloop_sock_table *table,
 
 	FD_ZERO(fds);
 
-	if (table->table == NULL)
+	fprintf(stderr, "adding sock: \n");
+	
+        if (table->table == NULL)
 		return;
 
 	for (i = 0; i < table->count; i++)
-		FD_SET(table->table[i].sock, fds);
+        {
+	    fprintf(stderr, "%i ", table->table[i].sock);
+            FD_SET(table->table[i].sock, fds);
+        }
+	fprintf(stderr, "\n");
 }
 
 
@@ -278,7 +287,9 @@ int eloop_register_sock(int sock, eloop_event_type type,
 			eloop_sock_handler handler,
 			void *eloop_data, void *user_data)
 {
-	struct eloop_sock_table *table;
+	fprintf(stderr, "eloop_register_sock %i\n", sock);
+    
+        struct eloop_sock_table *table;
 
 	table = eloop_get_sock_table(type);
 	return eloop_sock_table_add_sock(table, sock, handler,
@@ -517,11 +528,13 @@ void eloop_run(void)
 			_tv.tv_usec = tv.usec;
 		}
 
+                fprintf(stderr, "select starting.\n");
 		eloop_sock_table_set_fds(&eloop.readers, rfds);
 		eloop_sock_table_set_fds(&eloop.writers, wfds);
 		eloop_sock_table_set_fds(&eloop.exceptions, efds);
 		res = select(eloop.max_sock + 1, rfds, wfds, efds,
 			     timeout ? &_tv : NULL);
+                fprintf(stderr, "select finished %i.\n", res);
 		if (res < 0 && errno != EINTR && errno != 0) {
 			perror("select");
 			goto out;

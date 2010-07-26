@@ -47,6 +47,8 @@
 #include "bss.h"
 #include "scan.h"
 
+#include "../../src/nodes/wpa_supplicant_node.h"
+
 const char *wpa_supplicant_version =
 "wpa_supplicant v" VERSION_STR "\n"
 "Copyright (c) 2003-2010, Jouni Malinen <j@w1.fi> and contributors";

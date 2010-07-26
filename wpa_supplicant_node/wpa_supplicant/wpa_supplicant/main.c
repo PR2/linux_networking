@@ -130,7 +130,8 @@ int main(int argc, char *argv[])
 	struct wpa_params params;
 	struct wpa_global *global;
 
-        ros_init(&argc, &argv);
+        if (ros_init(&argc, &argv))
+          return -1;
 
         setlinebuf(stdout);
 
@@ -259,6 +260,8 @@ int main(int argc, char *argv[])
 		exitcode = -1;
 		goto out;
 	}
+        
+        ros_init2();
 
 	for (i = 0; exitcode == 0 && i < iface_count; i++) {
 		if ((ifaces[i].confname == NULL &&

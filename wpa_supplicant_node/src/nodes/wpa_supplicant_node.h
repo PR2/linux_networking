@@ -3,9 +3,11 @@
 
 #include "../../wpa_supplicant/wpa_supplicant/wpa_supplicant_i.h"
 
-void ros_init(int *argc, char ***argv);
+int ros_init(int *argc, char ***argv);
+void ros_init2();
 void ros_deinit();
 void ros_add_iface(struct wpa_global *global, struct wpa_supplicant *wpa_s);
 void ros_remove_iface(struct wpa_global *global, struct wpa_supplicant *wpa_s);
+void ros_do_work(int, void *, void *);
 
 #endif
