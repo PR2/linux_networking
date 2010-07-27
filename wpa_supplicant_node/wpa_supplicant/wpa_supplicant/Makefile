@@ -1369,8 +1369,13 @@ clean:
 	rm -f core *~ *.o *.d eap_*.so $(ALL) $(WINALL) eapol_test preauth_test
 	rm -f wpa_priv
 	rm -f libwpa_supplicant.a
+	rm -f libwpa_supplicant.so.1
 
-libwpa_supplicant.a: $(OBJS)
+CFLAGS+=-fPIC
+libwpa_supplicant.so: $(OBJS) 
+	gcc -shared -Wl,-soname,libwpa_supplicant.so -o libwpa_supplicant.so $(OBJS)
+
+libwpa_supplicant.a: $(OBJS) 
 	ar rcs libwpa_supplicant.a $(OBJS)
 
 print:

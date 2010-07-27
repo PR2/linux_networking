@@ -13,6 +13,8 @@ extern "C" {
 #include "../../wpa_supplicant/wpa_supplicant/wpa_supplicant_i.h"
 #include "wpa_supplicant_node.h"
 #include "eloop.h"
+#include "drivers/driver.h"
+#include "../../wpa_supplicant/wpa_supplicant/scan.h"
 }
 
 typedef boost::function<void ()> WorkFunction;
@@ -28,9 +30,17 @@ static class {
 public:
   void doWork()
   {
+    char buffer[16]; // Any non-zero size is fine here.
+
     ROS_INFO("doWork()");
 
     boost::mutex::scoped_lock(mutex_);
+
+    int bytes;
+    do {
+      bytes = read(pipefd[0], buffer, sizeof(buffer));
+      ROS_INFO("doWork read %i bytes from the dummy fifo.", bytes);
+    } while (bytes == sizeof(buffer));
 
     while (!work_queue_.empty())
     {
@@ -123,7 +133,19 @@ public:
       ROS_ERROR("scanCmopleted with current_scan_ not set.");
     else
     {
-      current_scan_.setSucceeded();
+      if (scan_res)
+      {
+        // TODO copy output to response.
+        ROS_INFO("Scan completed successfully.");
+        current_scan_.setSucceeded();
+      }
+      else
+      {
+        ROS_INFO("Scan failed.");
+        current_scan_.setAborted();
+      }
+      current_scan_ = ScanActionServer::GoalHandle();
+      lockedScanTryActivate();
     }
   }
 
@@ -160,11 +182,60 @@ private:
 
   void scanCancel(ScanActionServer::GoalHandle &gh)
   {
+    ROS_INFO("scanCancel()");
+    boost::mutex::scoped_lock(mutex_);
+    
+    // Are we still active (we may have succeeded before getting here)?
+    if (current_scan_ == gh)
+    {
+      // FIXME Anything I can do here to actually cancel the scan?
+      gh.setCanceled();
+      current_scan_ = ScanActionServer::GoalHandle();
+      scanTryActivate();
+    }
   }
 
-  void scanTryActivate()
+  void lockedScanTryActivate()
   {
     ROS_INFO("scanTryActivate()");
+    
+    // Do we have a scan to activate?
+    while (!scan_queue_.empty() && current_scan_ == ScanActionServer::GoalHandle())
+    {
+      current_scan_ = scan_queue_.front();
+      scan_queue_.pop();
+
+      // Is this scan still pending? (Otherwise it has already been
+      // canceled elsewhere.)
+      if (current_scan_.getGoalStatus().status != actionlib_msgs::GoalStatus::PENDING)
+      {
+        ROS_INFO("Skipping canceled scan.");
+        current_scan_ = ScanActionServer::GoalHandle();
+        continue;
+      }
+      
+      current_scan_.setAccepted();
+      
+      struct wpa_driver_scan_params wpa_req;
+      bzero(&wpa_req, sizeof(wpa_req));
+      
+      // FIXME Copy set of ESSIDs and freqs to scan.
+        
+      ROS_INFO("Starting scan.");
+      wpa_supplicant_trigger_scan(&wpa_s_, &wpa_req);
+    }
+      
+    ROS_INFO("Leaving scanTryActivate");
+    if (scan_queue_.empty())
+      ROS_INFO("scan_queue_ is empty.");
+    if (current_scan_ != ScanActionServer::GoalHandle())
+      ROS_INFO("A scan is active.");
+  }
+  
+  void scanTryActivate()
+  {
+    boost::mutex::scoped_lock(mutex_);
+    lockedScanTryActivate();
   }
 };
 

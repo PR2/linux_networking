@@ -25,7 +25,7 @@
 #include "notify.h"
 #include "bss.h"
 #include "scan.h"
-
+#include "../../src/nodes/wpa_supplicant_node.h"
 
 static void wpa_supplicant_gen_assoc_event(struct wpa_supplicant *wpa_s)
 {
@@ -197,6 +197,7 @@ int wpa_supplicant_trigger_scan(struct wpa_supplicant *wpa_s,
 	if (ret) {
 		wpa_supplicant_notify_scanning(wpa_s, 0);
 		wpas_notify_scan_done(wpa_s, 0);
+                ros_scan_completed(wpa_s, 0);
 	} else
 		wpa_s->scan_runs++;
 

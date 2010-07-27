@@ -40,7 +40,7 @@
 #include "bss.h"
 #include "mlme.h"
 #include "scan.h"
-
+#include "../../src/nodes/wpa_supplicant_node.h"
 
 static int wpa_supplicant_select_config(struct wpa_supplicant *wpa_s)
 {
@@ -261,6 +261,7 @@ int wpa_supplicant_scard_init(struct wpa_supplicant *wpa_s,
 
 
 #ifndef CONFIG_NO_SCAN_PROCESSING
+#if 0
 static int wpa_supplicant_match_privacy(struct wpa_scan_res *bss,
 					struct wpa_ssid *ssid)
 {
@@ -291,8 +292,9 @@ static int wpa_supplicant_match_privacy(struct wpa_scan_res *bss,
 		return privacy;
 	return !privacy;
 }
+#endif
 
-
+#if 0
 static int wpa_supplicant_ssid_bss_match(struct wpa_supplicant *wpa_s,
 					 struct wpa_ssid *ssid,
 					 struct wpa_scan_res *bss)
@@ -392,8 +394,9 @@ static int wpa_supplicant_ssid_bss_match(struct wpa_supplicant *wpa_s,
 
 	return 0;
 }
+#endif
 
-
+#if 0
 static int freq_allowed(int *freqs, int freq)
 {
 	int i;
@@ -406,8 +409,9 @@ static int freq_allowed(int *freqs, int freq)
 			return 1;
 	return 0;
 }
+#endif
 
-
+#if 0
 static struct wpa_bss *
 wpa_supplicant_select_bss_wpa(struct wpa_supplicant *wpa_s,
 			      struct wpa_scan_results *scan_res,
@@ -508,8 +512,9 @@ wpa_supplicant_select_bss_wpa(struct wpa_supplicant *wpa_s,
 
 	return NULL;
 }
+#endif
 
-
+#if 0
 static struct wpa_bss *
 wpa_supplicant_select_bss_non_wpa(struct wpa_supplicant *wpa_s,
 				  struct wpa_scan_results *scan_res,
@@ -641,8 +646,9 @@ wpa_supplicant_select_bss_non_wpa(struct wpa_supplicant *wpa_s,
 
 	return NULL;
 }
+#endif
 
-
+#if 0
 static struct wpa_bss *
 wpa_supplicant_select_bss(struct wpa_supplicant *wpa_s,
 			  struct wpa_scan_results *scan_res,
@@ -665,8 +671,9 @@ wpa_supplicant_select_bss(struct wpa_supplicant *wpa_s,
 	return wpa_supplicant_select_bss_non_wpa(wpa_s, scan_res, group,
 						 selected_ssid);
 }
+#endif
 
-
+#if 0
 static struct wpa_bss *
 wpa_supplicant_pick_network(struct wpa_supplicant *wpa_s,
 			    struct wpa_scan_results *scan_res,
@@ -695,7 +702,7 @@ wpa_supplicant_pick_network(struct wpa_supplicant *wpa_s,
 
 	return selected;
 }
-
+#endif
 
 static void wpa_supplicant_req_new_scan(struct wpa_supplicant *wpa_s,
 					int timeout_sec, int timeout_usec)
@@ -754,6 +761,7 @@ void wpa_supplicant_connect(struct wpa_supplicant *wpa_s,
 }
 
 
+#if 0
 static struct wpa_ssid *
 wpa_supplicant_pick_new_network(struct wpa_supplicant *wpa_s)
 {
@@ -772,7 +780,7 @@ wpa_supplicant_pick_new_network(struct wpa_supplicant *wpa_s)
 	}
 	return NULL;
 }
-
+#endif
 
 /* TODO: move the rsn_preauth_scan_result*() to be called from notify.c based
  * on BSS added and BSS changed events */
@@ -803,7 +811,7 @@ static void wpa_supplicant_rsn_preauth_scan_results(
 
 }
 
-
+#if 0
 static int wpa_supplicant_need_to_roam(struct wpa_supplicant *wpa_s,
 				       struct wpa_bss *selected,
 				       struct wpa_ssid *ssid,
@@ -876,20 +884,23 @@ static int wpa_supplicant_need_to_roam(struct wpa_supplicant *wpa_s,
 
 	return 1;
 }
-
+#endif
 
 static void wpa_supplicant_event_scan_results(struct wpa_supplicant *wpa_s,
 					      union wpa_event_data *data)
 {
-	struct wpa_bss *selected;
-	struct wpa_ssid *ssid = NULL;
+	//struct wpa_bss *selected;
+	//struct wpa_ssid *ssid = NULL;
 	struct wpa_scan_results *scan_res;
 
 	wpa_supplicant_notify_scanning(wpa_s, 0);
-
+                
 	scan_res = wpa_supplicant_get_scan_results(wpa_s,
 						   data ? &data->scan_info :
 						   NULL, 1);
+        
+        ros_scan_completed(wpa_s, scan_res);
+
 	if (scan_res == NULL) {
 		if (wpa_s->conf->ap_scan == 2)
 			return;
@@ -966,7 +977,6 @@ static void wpa_supplicant_event_scan_results(struct wpa_supplicant *wpa_s,
 						    timeout_usec);
 		}
 	} */
-        ros_scan_completed(scan_res);
 }
 #endif /* CONFIG_NO_SCAN_PROCESSING */
 
