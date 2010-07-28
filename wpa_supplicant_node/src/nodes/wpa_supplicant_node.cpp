@@ -6,6 +6,7 @@
 #include <fcntl.h>
 #include <queue>                  
 #include <wpa_supplicant_node/ScanAction.h>
+#include <wpa_supplicant_node/AssociateAction.h>
 
 extern "C" {
 #include "includes.h"
@@ -15,6 +16,8 @@ extern "C" {
 #include "eloop.h"
 #include "drivers/driver.h"
 #include "../../wpa_supplicant/wpa_supplicant/scan.h"
+#include "common/wpa_common.h"
+#include "common/ieee802_11_defs.h"
 }
 
 typedef boost::function<void ()> WorkFunction;
@@ -103,19 +106,29 @@ public:
 } ros_global;
 
 typedef actionlib::ActionServer<wpa_supplicant_node::ScanAction> ScanActionServer;
+typedef actionlib::ActionServer<wpa_supplicant_node::AssociateAction> AssociateActionServer;
 
 struct ros_api
 {
+private:
   wpa_supplicant &wpa_s_;
+
+//Scan Action
+  boost::mutex scan_mutex_;
   ScanActionServer sas_;
   std::queue<ScanActionServer::GoalHandle> scan_queue_;
-  boost::mutex mutex_;
   ScanActionServer::GoalHandle current_scan_;
+  std::vector<int> current_scan_frequencies_;
+
+// Associate Action
+  boost::mutex associate_mutex_;
+//  AssociateActionServer aas_;
   
 public:
   ros_api(const ros::NodeHandle &nh, wpa_supplicant *wpa_s) :
     wpa_s_(*wpa_s),
     sas_(nh, wpa_s->ifname, boost::bind(&ros_api::scanGoalCallback, this, _1), boost::bind(&ros_api::scanCancelCallback, this, _1), true)
+//    aas_(nh, wpa_s->ifname, boost::bind(&ros_api::associateGoalCallback, this, _1), boost::bind(&ros_api::associateCancelCallback, this, _1), true)
   {
   }
 
@@ -127,7 +140,7 @@ public:
   {
     ROS_INFO("scanCompleted");
 
-    boost::mutex::scoped_lock(mutex_);
+    boost::mutex::scoped_lock(scan_mutex_);
     
     if (current_scan_ == ScanActionServer::GoalHandle())
       ROS_ERROR("scanCmopleted with current_scan_ not set.");
@@ -137,7 +150,9 @@ public:
       {
         // TODO copy output to response.
         ROS_INFO("Scan completed successfully.");
-        current_scan_.setSucceeded();
+        wpa_supplicant_node::ScanResult rslt;
+        fillRosResp(rslt, *scan_res);
+        current_scan_.setSucceeded(rslt);
       }
       else
       {
@@ -149,10 +164,33 @@ public:
     }
   }
 
-private:
+private:                            
+  void fillRosResp(wpa_supplicant_node::ScanResult &rslt, wpa_scan_results &scan_res)
+  {
+    rslt.access_points.clear();
+    for (size_t i = 0; i < scan_res.num; i++)
+    {
+      wpa_scan_res &cur = *scan_res.res[i];
+      wpa_supplicant_node::AccessPoint ap;
+      const u8* ssid_ie = wpa_scan_get_ie(&cur, WLAN_EID_SSID);
+      int ssid_len = ssid_ie ? ssid_ie[1] : 0;
+      const char *ssid = ssid_ie ? (const char *) ssid_ie + 2 : "";
+      ap.ssid.assign(ssid, ssid_len);
+      memcpy(&ap.bssid[0], cur.bssid, sizeof(ap.bssid));
+      ap.noise = cur.noise;
+      ap.quality = cur.qual;
+      ap.level = cur.level;
+      ap.capabilities = cur.caps;
+      ap.beacon_interval = cur.beacon_int;
+      ap.frequency = cur.freq;
+      ap.age = cur.age / 1000.0;
+      rslt.access_points.push_back(ap);
+    }
+  }
+
   void scanGoalCallback(ScanActionServer::GoalHandle &gh)
   {
-    boost::mutex::scoped_lock(mutex_);
+    boost::mutex::scoped_lock(scan_mutex_);
     
     ROS_INFO("scanGoalCallback()");
 
@@ -164,7 +202,7 @@ private:
 
   void scanCancelCallback(ScanActionServer::GoalHandle &gh)
   {
-    boost::mutex::scoped_lock(mutex_);
+    boost::mutex::scoped_lock(scan_mutex_);
 
     unsigned int status = gh.getGoalStatus().status;
 
@@ -183,7 +221,7 @@ private:
   void scanCancel(ScanActionServer::GoalHandle &gh)
   {
     ROS_INFO("scanCancel()");
-    boost::mutex::scoped_lock(mutex_);
+    boost::mutex::scoped_lock(scan_mutex_);
     
     // Are we still active (we may have succeeded before getting here)?
     if (current_scan_ == gh)
@@ -197,6 +235,7 @@ private:
 
   void lockedScanTryActivate()
   {
+    // THIS VERSION SHOULD BE CALLED WITH THE LOCK HELD!
     ROS_INFO("scanTryActivate()");
     
     // Do we have a scan to activate?
@@ -214,15 +253,27 @@ private:
         continue;
       }
       
-      current_scan_.setAccepted();
-      
+      boost::shared_ptr<const wpa_supplicant_node::ScanGoal> goal = current_scan_.getGoal();
       struct wpa_driver_scan_params wpa_req;
       bzero(&wpa_req, sizeof(wpa_req));
       
-      // FIXME Copy set of ESSIDs and freqs to scan.
+      std::string err = fillWpaReq(goal, wpa_req);
+
+      if (err.empty())
+      {
+        current_scan_.setAccepted();
+                                
+        // FIXME Copy set of ESSIDs and freqs to scan.
         
-      ROS_INFO("Starting scan.");
-      wpa_supplicant_trigger_scan(&wpa_s_, &wpa_req);
+        ROS_INFO("Starting scan.");
+        wpa_supplicant_trigger_scan(&wpa_s_, &wpa_req);
+      }
+      else
+      {
+        current_scan_.setRejected(wpa_supplicant_node::ScanResult(), err);
+        current_scan_ = ScanActionServer::GoalHandle();
+        continue;
+      }
     }
       
     ROS_INFO("Leaving scanTryActivate");
@@ -231,10 +282,42 @@ private:
     if (current_scan_ != ScanActionServer::GoalHandle())
       ROS_INFO("A scan is active.");
   }
+ 
+  std::string fillWpaReq(boost::shared_ptr<const wpa_supplicant_node::ScanGoal> &g, struct wpa_driver_scan_params &wpa_req)
+  {
+    wpa_req.num_ssids = g->ssids.size();
+
+#define QUOTEME(x) #x
+    if (wpa_req.num_ssids > WPAS_MAX_SCAN_SSIDS)
+      return "Too many ESSIDs in scan request. Maximum number is "QUOTEME(WPAS_MAX_SCAN_SSIDS)".";
+
+    for (unsigned int i = 0; i < wpa_req.num_ssids; i++)
+    {
+      wpa_req.ssids[i].ssid = (const u8 *) &g->ssids[i][0];
+      wpa_req.ssids[i].ssid_len = g->ssids[i].size();
+
+      if (wpa_req.ssids[i].ssid_len > WPA_MAX_SSID_LEN)
+        return "Ssid is too long. Maximum length is "QUOTEME(WPA_MAX_SSID_LEN)" characters.";
+    }
+#undef QUOTEME
+                                    
+    current_scan_frequencies_.clear();
+    int num_frequencies = g->frequencies.size();
+    
+    if (num_frequencies > 0)
+    {
+      for (int i = 0; i < num_frequencies; i++)
+        current_scan_frequencies_.push_back(g->frequencies[i]);
+      current_scan_frequencies_.push_back(0);
+      wpa_req.freqs = &current_scan_frequencies_[0];
+    }
   
+    return "";
+  }
+
   void scanTryActivate()
   {
-    boost::mutex::scoped_lock(mutex_);
+    boost::mutex::scoped_lock(scan_mutex_);
     lockedScanTryActivate();
   }
 };

@@ -1,5 +1,5 @@
-Ssid[] ssids # Ssids to scan
-int32[] channels # Channels to scan in MHz
+string[] ssids # Ssids to scan
+int32[] frequencies # Channels to scan in MHz
 ---
 int32 SUCCESS = 0
 int32 TOO_MANY_SSIDS = 1
@@ -7,8 +7,5 @@ int32 TOO_MANY_CHANNELS = 2
 int32 SCAN_REQUEST_FAILED = 3
 int32 SCAN_REQUEST_TIMED_OUT = 4
 
-Header header
-int32 error_code
-string error_message
 AccessPoint[] access_points
 ---
