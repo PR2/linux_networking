@@ -10,6 +10,12 @@ def scan(iface = 'wlan0', ssid = [], freq = []):
     client.wait_for_server()
 
     goal = wpa_supplicant_node.msg.ScanGoal()
+    print goal.ssids
+    for s in ssid:
+        goal.ssids.append(s)
+    for f in freq:
+        goal.frequencies.append(f)
+    print goal.ssids
     rospy.loginfo("Sending goal.")
     client.send_goal(goal)
     rospy.loginfo("Waiting for result.")
@@ -21,7 +27,7 @@ if __name__ == '__main__':
         # Initializes a rospy node so that the SimpleActionClient can
         # publish and subscribe over ROS.
         rospy.init_node('test_scan')
-        result = scan()
+        result = scan(ssid=['willow'], freq = [5180])
         print result
     except KeyboardInterrupt:
         print "program interrupted before completion"
