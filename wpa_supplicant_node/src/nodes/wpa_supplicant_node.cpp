@@ -9,15 +9,17 @@
 #include <wpa_supplicant_node/AssociateAction.h>
 
 extern "C" {
-#include "includes.h"
-#include "common.h"
-#include "../../wpa_supplicant/wpa_supplicant/wpa_supplicant_i.h"
+#include <includes.h>
+#include <common.h>
+#include <wpa_supplicant_i.h>
+#include <eloop.h>
+#include <drivers/driver.h>
+#include <scan.h>
+#include <bss.h>
+#include <config.h>
+#include <common/wpa_common.h>
+#include <common/ieee802_11_defs.h>
 #include "wpa_supplicant_node.h"
-#include "eloop.h"
-#include "drivers/driver.h"
-#include "../../wpa_supplicant/wpa_supplicant/scan.h"
-#include "common/wpa_common.h"
-#include "common/ieee802_11_defs.h"
 }
 
 typedef boost::function<void ()> WorkFunction;
@@ -63,7 +65,6 @@ public:
     work_queue_.push(f);
     if (write(pipefd[1], dummy, 1) != 1)
       ROS_ERROR("addWork Failed to write to wakeup pipe.");
-    // FIXME Notify the event loop kill(eloop_pid_, SIGALARM);
   }
 
   int init(int *argc, char ***argv)
@@ -107,11 +108,13 @@ public:
 
 typedef actionlib::ActionServer<wpa_supplicant_node::ScanAction> ScanActionServer;
 typedef actionlib::ActionServer<wpa_supplicant_node::AssociateAction> AssociateActionServer;
+const ScanActionServer     ::GoalHandle null_scan_goal_handle_;
+const AssociateActionServer::GoalHandle null_associate_goal_handle_;
 
 struct ros_api
 {
 private:
-  wpa_supplicant &wpa_s_;
+  wpa_supplicant *wpa_s_;
 
 //Scan Action
   boost::mutex scan_mutex_;
@@ -122,13 +125,17 @@ private:
 
 // Associate Action
   boost::mutex associate_mutex_;
-//  AssociateActionServer aas_;
+  AssociateActionServer aas_;
+  AssociateActionServer::GoalHandle active_association_;
+  bool associate_work_requested_;
+  std::queue<AssociateActionServer::GoalHandle> associate_goal_queue_;
+  std::queue<AssociateActionServer::GoalHandle> associate_cancel_queue_;
   
 public:
   ros_api(const ros::NodeHandle &nh, wpa_supplicant *wpa_s) :
-    wpa_s_(*wpa_s),
-    sas_(nh, wpa_s->ifname, boost::bind(&ros_api::scanGoalCallback, this, _1), boost::bind(&ros_api::scanCancelCallback, this, _1), true)
-//    aas_(nh, wpa_s->ifname, boost::bind(&ros_api::associateGoalCallback, this, _1), boost::bind(&ros_api::associateCancelCallback, this, _1), true)
+    wpa_s_(wpa_s),
+    sas_(nh, std::string(wpa_s->ifname) + "/scan",      boost::bind(&ros_api::scanGoalCallback,      this, _1), boost::bind(&ros_api::scanCancelCallback,      this, _1), true),
+    aas_(nh, std::string(wpa_s->ifname) + "/associate", boost::bind(&ros_api::associateGoalCallback, this, _1), boost::bind(&ros_api::associateCancelCallback, this, _1), true)
   {
   }
 
@@ -142,7 +149,7 @@ public:
 
     boost::mutex::scoped_lock(scan_mutex_);
     
-    if (current_scan_ == ScanActionServer::GoalHandle())
+    if (current_scan_ == null_scan_goal_handle_)
       ROS_ERROR("scanCmopleted with current_scan_ not set.");
     else
     {
@@ -159,32 +166,136 @@ public:
         ROS_INFO("Scan failed.");
         current_scan_.setAborted();
       }
-      current_scan_ = ScanActionServer::GoalHandle();
+      current_scan_ = null_scan_goal_handle_;
       lockedScanTryActivate();
     }
   }
 
-private:                            
+private:       
+  void requestAssociateWork()
+  {
+      associate_work_requested_ = true;
+      ros_global.addWork(boost::bind(&ros_api::associateWork, this));
+  }
+
+  void stopActiveAssociation()
+  {
+    ROS_INFO("stopActiveAssociation()");
+    if (active_association_ == null_associate_goal_handle_)
+      ROS_ERROR("stopActiveAssociation called with no active association.");
+    
+    wpa_supplicant_disassociate(wpa_s_, WLAN_REASON_DEAUTH_LEAVING);
+    active_association_ = null_associate_goal_handle_;
+  }
+
+  void startActiveAssociation(AssociateActionServer::GoalHandle &gh)
+  {
+    ROS_INFO("startActiveAssociation()");
+    if (active_association_ != null_associate_goal_handle_)
+      ROS_ERROR("startActiveAssociation called with no active association.");
+
+    wpa_bss *bss;
+    boost::shared_ptr<const wpa_supplicant_node::AssociateGoal> goal = gh.getGoal();
+    bss = wpa_bss_get(wpa_s_, &goal->bss.bssid[0], (u8 *) goal->bss.ssid.c_str(), goal->bss.ssid.length());
+    
+    wpa_ssid *ssid;
+    for (ssid = wpa_s_->conf->ssid; ssid != NULL; ssid = ssid->next)
+      if (goal->bss.ssid.length() == ssid->ssid_len && !os_memcmp(goal->bss.ssid.c_str(), ssid->ssid, ssid->ssid_len))
+          break;
+
+    if (bss && ssid && goal->bss.frequency == bss->freq)
+    {
+      ROS_INFO("wpa_s in startActiveAssociation: %p", wpa_s_);
+      ROS_INFO("wpa_s.ros in startActiveAssociation: %p", wpa_s_->ros_api);
+      ROS_INFO("&wpa_s.ros_api in startActiveAssociation: %p", &wpa_s_->ros_api);
+      ROS_INFO("sizeof(wpa_s) in startActiveAssociation: %zi", sizeof(*wpa_s_));
+      wpa_supplicant_associate(wpa_s_, bss, ssid);
+      gh.setAccepted();
+      active_association_ = gh;
+    }
+    else
+    {
+      ROS_ERROR("startActiveAssociation could not find requested bss, ssid or frequency.");
+      gh.setRejected();
+    }
+  }
+
+  void associateWork()
+  {
+    boost::mutex::scoped_lock(associate_mutex_);
+
+    associate_work_requested_ = false;
+
+    while (!associate_cancel_queue_.empty())
+    {
+      AssociateActionServer::GoalHandle gh = associate_cancel_queue_.front();
+      associate_cancel_queue_.pop();
+      if (gh == active_association_)
+        stopActiveAssociation();
+      gh.setCanceled();
+    }
+
+    while (associate_goal_queue_.size() > 1)
+    {
+      AssociateActionServer::GoalHandle gh = associate_goal_queue_.front();
+      associate_goal_queue_.pop();
+      gh.setRejected();
+    }
+    
+    if (!associate_goal_queue_.empty())
+    {
+      if (active_association_ != null_associate_goal_handle_)
+      {
+        // Don't call stopActiveAssociation here so that reassociate can
+        // happen. FIXME What happens if reassoc fails? Are we back on the
+        // original AP? That doesn't sound great.
+        active_association_.setAborted();
+        active_association_ = null_associate_goal_handle_; // Avoids error message in startActiveAssociation.
+      }
+
+      AssociateActionServer::GoalHandle gh = associate_goal_queue_.front();
+      associate_goal_queue_.pop();
+      
+      startActiveAssociation(gh);      
+    }
+  }
+
+  void associateGoalCallback(AssociateActionServer::GoalHandle &gh)
+  {
+    boost::mutex::scoped_lock(associate_mutex_);
+    
+    associate_goal_queue_.push(gh);
+    requestAssociateWork();
+  }
+
+  void associateCancelCallback(AssociateActionServer::GoalHandle &gh)
+  {
+    boost::mutex::scoped_lock(associate_mutex_);
+    
+    associate_cancel_queue_.push(gh);
+    requestAssociateWork();
+  }
+  
   void fillRosResp(wpa_supplicant_node::ScanResult &rslt, wpa_scan_results &scan_res)
   {
-    rslt.access_points.clear();
+    rslt.bss.clear();
     for (size_t i = 0; i < scan_res.num; i++)
     {
       wpa_scan_res &cur = *scan_res.res[i];
-      wpa_supplicant_node::AccessPoint ap;
+      wpa_supplicant_node::Bss bss;
       const u8* ssid_ie = wpa_scan_get_ie(&cur, WLAN_EID_SSID);
       int ssid_len = ssid_ie ? ssid_ie[1] : 0;
       const char *ssid = ssid_ie ? (const char *) ssid_ie + 2 : "";
-      ap.ssid.assign(ssid, ssid_len);
-      memcpy(&ap.bssid[0], cur.bssid, sizeof(ap.bssid));
-      ap.noise = cur.noise;
-      ap.quality = cur.qual;
-      ap.level = cur.level;
-      ap.capabilities = cur.caps;
-      ap.beacon_interval = cur.beacon_int;
-      ap.frequency = cur.freq;
-      ap.age = cur.age / 1000.0;
-      rslt.access_points.push_back(ap);
+      bss.ssid.assign(ssid, ssid_len);
+      memcpy(&bss.bssid[0], cur.bssid, sizeof(bss.bssid));
+      bss.noise = cur.noise;
+      bss.quality = cur.qual;
+      bss.level = cur.level;
+      bss.capabilities = cur.caps;
+      bss.beacon_interval = cur.beacon_int;
+      bss.frequency = cur.freq;
+      bss.age = cur.age / 1000.0;
+      rslt.bss.push_back(bss);
     }
   }
 
@@ -196,7 +307,7 @@ private:
 
     scan_queue_.push(gh);
 
-    if (current_scan_ == ScanActionServer::GoalHandle())
+    if (current_scan_ == null_scan_goal_handle_)
       ros_global.addWork(boost::bind(&ros_api::scanTryActivate, this));
   }
 
@@ -228,7 +339,7 @@ private:
     {
       // FIXME Anything I can do here to actually cancel the scan?
       gh.setCanceled();
-      current_scan_ = ScanActionServer::GoalHandle();
+      current_scan_ = null_scan_goal_handle_;
       scanTryActivate();
     }
   }
@@ -239,7 +350,7 @@ private:
     ROS_INFO("scanTryActivate()");
     
     // Do we have a scan to activate?
-    while (!scan_queue_.empty() && current_scan_ == ScanActionServer::GoalHandle())
+    while (!scan_queue_.empty() && current_scan_ == null_scan_goal_handle_)
     {
       current_scan_ = scan_queue_.front();
       scan_queue_.pop();
@@ -249,7 +360,7 @@ private:
       if (current_scan_.getGoalStatus().status != actionlib_msgs::GoalStatus::PENDING)
       {
         ROS_INFO("Skipping canceled scan.");
-        current_scan_ = ScanActionServer::GoalHandle();
+        current_scan_ = null_scan_goal_handle_;
         continue;
       }
       
@@ -266,12 +377,12 @@ private:
         // FIXME Copy set of ESSIDs and freqs to scan.
         
         ROS_INFO("Starting scan.");
-        wpa_supplicant_trigger_scan(&wpa_s_, &wpa_req);
+        wpa_supplicant_trigger_scan(wpa_s_, &wpa_req);
       }
       else
       {
         current_scan_.setRejected(wpa_supplicant_node::ScanResult(), err);
-        current_scan_ = ScanActionServer::GoalHandle();
+        current_scan_ = null_scan_goal_handle_;
         continue;
       }
     }
@@ -279,7 +390,7 @@ private:
     ROS_INFO("Leaving scanTryActivate");
     if (scan_queue_.empty())
       ROS_INFO("scan_queue_ is empty.");
-    if (current_scan_ != ScanActionServer::GoalHandle())
+    if (current_scan_ != null_scan_goal_handle_)
       ROS_INFO("A scan is active.");
   }
  
@@ -293,7 +404,7 @@ private:
 
     for (unsigned int i = 0; i < wpa_req.num_ssids; i++)
     {
-      wpa_req.ssids[i].ssid = (const u8 *) &g->ssids[i][0];
+      wpa_req.ssids[i].ssid = (const u8 *) g->ssids[i].c_str();
       wpa_req.ssids[i].ssid_len = g->ssids[i].size();
 
       if (wpa_req.ssids[i].ssid_len > WPA_MAX_SSID_LEN)
@@ -343,6 +454,8 @@ void ros_add_iface(wpa_global *global, wpa_supplicant *wpa_s)
 {
   ROS_INFO("ros_add_iface");
   wpa_s->ros_api = new ros_api(ros::NodeHandle(), wpa_s);
+  ROS_INFO("wpa_s in ros_add_iface: %p", wpa_s);
+  ROS_INFO("wpa_s.ros in ros_add_iface: %p", wpa_s->ros_api);
 }
 
 void ros_remove_iface(wpa_global *global, wpa_supplicant *wpa_s)
@@ -358,12 +471,18 @@ void ros_iface_idle(wpa_supplicant *wpa_s)
   
 void ros_scan_completed(wpa_supplicant *wpa_s, wpa_scan_results *scan_res)
 {
+  ROS_INFO("wpa_s in ros_scan_completed: %p", wpa_s);
+  ROS_INFO("wpa_s.ros in ros_scan_completed: %p", wpa_s->ros_api);
   wpa_s->ros_api->scanCompleted(scan_res);
 }
 
 void ros_do_work(int, void *, void *)
 {
   ros_global.doWork();
+}
+
+void ros_assoc_failed()
+{
 }
 
 } // extern "C"

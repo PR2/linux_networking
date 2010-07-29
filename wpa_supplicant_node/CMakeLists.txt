@@ -18,6 +18,7 @@ rosbuild_init()
 link_directories(${PROJECT_SOURCE_DIR}/wpa_supplicant/wpa_supplicant)
 include_directories(${PROJECT_SOURCE_DIR}/wpa_supplicant/src)
 include_directories(${PROJECT_SOURCE_DIR}/wpa_supplicant/src/utils)
+include_directories(${PROJECT_SOURCE_DIR}/wpa_supplicant/wpa_supplicant)
 
 #set the default path for built executables to the "bin" directory
 set(EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/bin)

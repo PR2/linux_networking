@@ -1372,7 +1372,10 @@ clean:
 	rm -f libwpa_supplicant.so.1
 
 CFLAGS+=-fPIC
-libwpa_supplicant.so: $(OBJS) 
+CFLAGS+=-fno-strict-aliasing # ROS Uses this, structures won't match without it.
+CFLAGS+=-pthread
+libwpa_supplicant.so: $(OBJS)
+	@echo wpa_supplicant CFLAGS: $(CFLAGS)
 	gcc -shared -Wl,-soname,libwpa_supplicant.so -o libwpa_supplicant.so $(OBJS)
 
 libwpa_supplicant.a: $(OBJS) 
