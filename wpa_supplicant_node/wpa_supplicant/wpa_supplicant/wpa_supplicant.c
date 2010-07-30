@@ -203,7 +203,8 @@ static void wpa_supplicant_timeout(void *eloop_ctx, void *timeout_ctx)
 	wpa_sm_notify_disassoc(wpa_s->wpa);
 	wpa_supplicant_disassociate(wpa_s, WLAN_REASON_DEAUTH_LEAVING);
 	wpa_s->reassociate = 1;
-	wpa_supplicant_req_scan(wpa_s, 0, 0);
+        ros_assoc_failed();
+	//wpa_supplicant_req_scan(wpa_s, 0, 0);
 }
 
 
@@ -671,7 +672,7 @@ int wpa_supplicant_reload_configuration(struct wpa_supplicant *wpa_s)
 
 	wpa_supplicant_clear_status(wpa_s);
 	wpa_s->reassociate = 1;
-	wpa_supplicant_req_scan(wpa_s, 0, 0);
+	//wpa_supplicant_req_scan(wpa_s, 0, 0);
 	wpa_msg(wpa_s, MSG_DEBUG, "Reconfiguration completed");
 	return 0;
 }
@@ -1392,15 +1393,15 @@ void wpa_supplicant_enable_network(struct wpa_supplicant *wpa_s,
 
 			other_ssid = other_ssid->next;
 		}
-		if (wpa_s->reassociate)
-			wpa_supplicant_req_scan(wpa_s, 0, 0);
+		//if (wpa_s->reassociate)
+		//	wpa_supplicant_req_scan(wpa_s, 0, 0);
 	} else if (wpa_s->current_ssid == NULL && ssid->disabled) {
 		/*
 		 * Try to reassociate since there is no current configuration
 		 * and a new network was made available.
 		 */
 		wpa_s->reassociate = 1;
-		wpa_supplicant_req_scan(wpa_s, 0, 0);
+		//wpa_supplicant_req_scan(wpa_s, 0, 0);
 
 		was_disabled = ssid->disabled;
 
@@ -1488,7 +1489,7 @@ void wpa_supplicant_select_network(struct wpa_supplicant *wpa_s,
 	}
 	wpa_s->disconnected = 0;
 	wpa_s->reassociate = 1;
-	wpa_supplicant_req_scan(wpa_s, 0, 0);
+	//wpa_supplicant_req_scan(wpa_s, 0, 0);
 
 	if (ssid)
 		wpas_notify_network_selected(wpa_s, ssid);

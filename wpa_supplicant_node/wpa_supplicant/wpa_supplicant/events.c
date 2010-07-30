@@ -100,7 +100,7 @@ static void wpa_supplicant_stop_countermeasures(void *eloop_ctx,
 		wpa_s->countermeasures = 0;
 		wpa_drv_set_countermeasures(wpa_s, 0);
 		wpa_msg(wpa_s, MSG_INFO, "WPA: TKIP countermeasures stopped");
-		wpa_supplicant_req_scan(wpa_s, 0, 0);
+		//wpa_supplicant_req_scan(wpa_s, 0, 0);
 	}
 }
 
@@ -904,9 +904,9 @@ static void wpa_supplicant_event_scan_results(struct wpa_supplicant *wpa_s,
 	if (scan_res == NULL) {
 		if (wpa_s->conf->ap_scan == 2)
 			return;
-		wpa_printf(MSG_DEBUG, "Failed to get scan results - try "
+		wpa_printf(MSG_DEBUG, "Failed to get scan results - don't bother try "
 			   "scanning again");
-		wpa_supplicant_req_new_scan(wpa_s, 1, 0);
+		//wpa_supplicant_req_new_scan(wpa_s, 1, 0);
 		return;
 	}
 
@@ -1289,6 +1289,8 @@ static void wpa_supplicant_event_disassoc(struct wpa_supplicant *wpa_s,
 	os_memcpy(prev_pending_bssid, wpa_s->pending_bssid, ETH_ALEN);
 #endif /* CONFIG_SME */
 
+        ros_assoc_failed();
+
 	if (wpa_s->key_mgmt == WPA_KEY_MGMT_WPA_NONE) {
 		/*
 		 * At least Host AP driver and a Prism3 card seemed to be
@@ -1305,8 +1307,8 @@ static void wpa_supplicant_event_disassoc(struct wpa_supplicant *wpa_s,
 		wpa_msg(wpa_s, MSG_INFO, "WPA: 4-Way Handshake failed - "
 			"pre-shared key may be incorrect");
 	}
-	if (wpa_s->wpa_state >= WPA_ASSOCIATED)
-		wpa_supplicant_req_scan(wpa_s, 0, 100000);
+	//if (wpa_s->wpa_state >= WPA_ASSOCIATED)
+	//	wpa_supplicant_req_scan(wpa_s, 0, 100000);
 	bssid = wpa_s->bssid;
 	if (is_zero_ether_addr(bssid))
 		bssid = wpa_s->pending_bssid;

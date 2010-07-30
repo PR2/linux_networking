@@ -228,8 +228,9 @@ void sme_authenticate(struct wpa_supplicant *wpa_s,
 	if (wpa_drv_authenticate(wpa_s, &params) < 0) {
 		wpa_msg(wpa_s, MSG_INFO, "Authentication request to the "
 			"driver failed");
-                wpa_supplicant_req_scan(wpa_s, 0, 200000);
-		return;
+                //wpa_supplicant_req_scan(wpa_s, 0, 200000);
+		ros_assoc_failed();
+                return;
 	}
 
 	/* TODO: add timeout on authentication */
@@ -343,7 +344,8 @@ void sme_associate(struct wpa_supplicant *wpa_s, enum wpas_mode mode,
 	if (wpa_drv_associate(wpa_s, &params) < 0) {
 		wpa_msg(wpa_s, MSG_INFO, "Association request to the driver "
 			"failed");
-		wpa_supplicant_req_scan(wpa_s, 5, 0);
+		//wpa_supplicant_req_scan(wpa_s, 5, 0);
+                ros_assoc_failed();
 		return;
 	}
 
@@ -422,8 +424,9 @@ void sme_event_assoc_reject(struct wpa_supplicant *wpa_s,
 	 * TODO: if more than one possible AP is available in scan results,
 	 * could try the other ones before requesting a new scan.
 	 */
-	wpa_supplicant_req_scan(wpa_s, timeout / 1000,
-				1000 * (timeout % 1000));
+        ros_assoc_failed();
+	//wpa_supplicant_req_scan(wpa_s, timeout / 1000,
+	//			1000 * (timeout % 1000));
 }
 
 
@@ -445,8 +448,9 @@ void sme_event_auth_timed_out(struct wpa_supplicant *wpa_s,
 			timeout = 100;
 		}
 	}
-	wpa_supplicant_req_scan(wpa_s, timeout / 1000,
-				1000 * (timeout % 1000));
+        ros_assoc_failed();
+	//wpa_supplicant_req_scan(wpa_s, timeout / 1000,
+	//			1000 * (timeout % 1000));
 }
 
 
@@ -455,7 +459,8 @@ void sme_event_assoc_timed_out(struct wpa_supplicant *wpa_s,
 {
 	wpa_printf(MSG_DEBUG, "SME: Association timed out");
 	wpa_supplicant_mark_disassoc(wpa_s);
-	wpa_supplicant_req_scan(wpa_s, 5, 0);
+        ros_assoc_failed();
+	//wpa_supplicant_req_scan(wpa_s, 5, 0);
 }
 
 
