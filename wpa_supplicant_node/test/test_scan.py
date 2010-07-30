@@ -21,13 +21,16 @@ def scan(iface = 'wlan0', ssid = [], freq = []):
     client.wait_for_result()
     return client.get_result()  
 
+def associated(feedback):
+    print "We are associated!"
+
 def associate(iface, bss):
     client = actionlib.SimpleActionClient(iface+"/associate", wpa_supplicant_node.msg.AssociateAction)
     rospy.loginfo("Waiting for server.")
     client.wait_for_server()
 
     rospy.loginfo("Sending goal.")
-    client.send_goal(wpa_supplicant_node.msg.AssociateGoal(bss))
+    client.send_goal(wpa_supplicant_node.msg.AssociateGoal(bss), feedback_cb=associated)
     rospy.loginfo("Waiting for result.")
     client.wait_for_result()
 

@@ -1289,7 +1289,7 @@ static void wpa_supplicant_event_disassoc(struct wpa_supplicant *wpa_s,
 	os_memcpy(prev_pending_bssid, wpa_s->pending_bssid, ETH_ALEN);
 #endif /* CONFIG_SME */
 
-        ros_assoc_failed();
+        ros_assoc_failed(wpa_s, "Dissasociation event received");
 
 	if (wpa_s->key_mgmt == WPA_KEY_MGMT_WPA_NONE) {
 		/*

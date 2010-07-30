@@ -171,6 +171,26 @@ public:
     }
   }
 
+  void assocFailed(const char *s)
+  {
+    ROS_INFO("assocFailed");
+    boost::mutex::scoped_lock(associate_mutex_);
+    active_association_.setAborted();
+    stopActiveAssociation(false);
+  }
+  
+  void assocSucceeded()
+  {
+    ROS_INFO("assocSucceeded");
+    boost::mutex::scoped_lock(associate_mutex_);
+
+    wpa_supplicant_node::AssociateFeedback fbk;
+    fbk.associated = true;
+    // FIXME Set BSS.
+    // FIXME Flag a problem if called twice.
+    active_association_.publishFeedback(fbk);
+  }
+
 private:       
   void requestAssociateWork()
   {
@@ -178,13 +198,14 @@ private:
       ros_global.addWork(boost::bind(&ros_api::associateWork, this));
   }
 
-  void stopActiveAssociation()
+  void stopActiveAssociation(bool disassociate = true)
   {
     ROS_INFO("stopActiveAssociation()");
     if (active_association_ == null_associate_goal_handle_)
       ROS_ERROR("stopActiveAssociation called with no active association.");
     
-    wpa_supplicant_disassociate(wpa_s_, WLAN_REASON_DEAUTH_LEAVING);
+    if (disassociate)
+      wpa_supplicant_disassociate(wpa_s_, WLAN_REASON_DEAUTH_LEAVING);
     active_association_ = null_associate_goal_handle_;
   }
 
@@ -209,9 +230,12 @@ private:
       ROS_INFO("wpa_s.ros in startActiveAssociation: %p", wpa_s_->ros_api);
       ROS_INFO("&wpa_s.ros_api in startActiveAssociation: %p", &wpa_s_->ros_api);
       ROS_INFO("sizeof(wpa_s) in startActiveAssociation: %zi", sizeof(*wpa_s_));
-      wpa_supplicant_associate(wpa_s_, bss, ssid);
       gh.setAccepted();
       active_association_ = gh;
+      wpa_supplicant_associate(wpa_s_, bss, ssid);
+      wpa_supplicant_node::AssociateFeedback fbk;
+      fbk.associated = false;
+      active_association_.publishFeedback(fbk);
     }
     else
     {
@@ -481,8 +505,14 @@ void ros_do_work(int, void *, void *)
   ros_global.doWork();
 }
 
-void ros_assoc_failed()
+void ros_assoc_failed(wpa_supplicant *wpa_s, const char *reason)
 {
+  wpa_s->ros_api->assocFailed(reason);
+}
+
+void ros_assoc_success(wpa_supplicant *wpa_s)
+{
+  wpa_s->ros_api->assocSucceeded();
 }
 
 } // extern "C"
