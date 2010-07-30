@@ -9,8 +9,8 @@ endif
 export LIBDIR ?= /usr/local/lib/
 export BINDIR ?= /usr/local/sbin/
 
-CFLAGS += -I../src
-CFLAGS += -I../src/utils
+CFLAGS += -I$(CURDIR)/../src
+CFLAGS += -I$(CURDIR)/../src/utils
 
 ALL=wpa_supplicant wpa_passphrase wpa_cli
 
@@ -1374,12 +1374,24 @@ clean:
 CFLAGS+=-fPIC
 CFLAGS+=-fno-strict-aliasing # ROS Uses this, structures won't match without it.
 CFLAGS+=-pthread
-libwpa_supplicant.so: $(OBJS)
+libwpa_supplicant.so: $(OBJS) Makefile
 	@echo wpa_supplicant CFLAGS: $(CFLAGS)
 	gcc -shared -Wl,-soname,libwpa_supplicant.so -o libwpa_supplicant.so $(OBJS)
 
-libwpa_supplicant.a: $(OBJS) 
+libwpa_supplicant.a: $(OBJS) Makefile
 	ar rcs libwpa_supplicant.a $(OBJS)
+
+wpa_supplicant.pc: Makefile
+	echo > libwpa_supplicant.pc
+	#echo prefix=$(CURDIR) > libwpa_supplicant.pc
+	#echo libdir=$(CURDIR) >> libwpa_supplicant.pc
+	echo Name: libwpa_supplicant >> libwpa_supplicant.pc
+	echo Description: Library containing wpa_supplicant. >> libwpa_supplicant.pc
+	echo Version: 0.1.0 >> libwpa_supplicant.pc
+	echo Requires: >> libwpa_supplicant.pc
+	echo Libs: -lwpa_supplicant $(LDFLAGS) $(LIBS) $(EXTRALIBS) -L$(CURDIR) >> libwpa_supplicant.pc
+	echo Cflags: $(CFLAGS) -I$(CURDIR) >> libwpa_supplicant.pc
+
 
 print:
 	echo OBJS

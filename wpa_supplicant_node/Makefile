@@ -2,7 +2,7 @@ PACKAGE_DIR=$(shell pwd)
 PACKAGE=$(notdir $(PACKAGE_DIR))
 
 my_all: 
-	make -C wpa_supplicant/wpa_supplicant libwpa_supplicant.so
+	make -C wpa_supplicant/wpa_supplicant libwpa_supplicant.so wpa_supplicant.pc
 	make all
 
 clean: my_clean
