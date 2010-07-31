@@ -231,7 +231,7 @@ void sme_authenticate(struct wpa_supplicant *wpa_s,
 		wpa_msg(wpa_s, MSG_INFO, "Authentication request to the "
 			"driver failed");
                 //wpa_supplicant_req_scan(wpa_s, 0, 200000);
-		ros_assoc_failed(wpa_s, "Driver request to authenticate failed");
+		ros_assoc_failed(wpa_s, bss->bssid, "Driver request to authenticate failed");
                 return;
 	}
 
@@ -277,6 +277,7 @@ void sme_event_auth(struct wpa_supplicant *wpa_s, union wpa_event_data *data)
 	if (data->auth.status_code != WLAN_STATUS_SUCCESS) {
 		wpa_printf(MSG_DEBUG, "SME: Authentication failed (status "
 			   "code %d)", data->auth.status_code);
+                ros_assoc_failed(wpa_s, data->auth.peer, "Authentication failed");
 		return;
 	}
 
@@ -347,7 +348,7 @@ void sme_associate(struct wpa_supplicant *wpa_s, enum wpas_mode mode,
 		wpa_msg(wpa_s, MSG_INFO, "Association request to the driver "
 			"failed");
 		//wpa_supplicant_req_scan(wpa_s, 5, 0);
-                ros_assoc_failed(wpa_s, "Driver request to associate failed");
+                ros_assoc_failed(wpa_s, bssid, "Driver request to associate failed");
 		return;
 	}
 
@@ -426,7 +427,7 @@ void sme_event_assoc_reject(struct wpa_supplicant *wpa_s,
 	 * TODO: if more than one possible AP is available in scan results,
 	 * could try the other ones before requesting a new scan.
 	 */
-        ros_assoc_failed(wpa_s, "Association rejected");
+        ros_assoc_failed(wpa_s, wpa_s->pending_bssid, "Association rejected");
 	//wpa_supplicant_req_scan(wpa_s, timeout / 1000,
 	//			1000 * (timeout % 1000));
 }
@@ -450,7 +451,7 @@ void sme_event_auth_timed_out(struct wpa_supplicant *wpa_s,
 			timeout = 100;
 		}
 	}
-        ros_assoc_failed(wpa_s, "Authentication timed out");
+        ros_assoc_failed(wpa_s, wpa_s->pending_bssid, "Authentication timed out");
 	//wpa_supplicant_req_scan(wpa_s, timeout / 1000,
 	//			1000 * (timeout % 1000));
 }
@@ -461,7 +462,7 @@ void sme_event_assoc_timed_out(struct wpa_supplicant *wpa_s,
 {
 	wpa_printf(MSG_DEBUG, "SME: Association timed out");
 	wpa_supplicant_mark_disassoc(wpa_s);
-        ros_assoc_failed(wpa_s, "Association timed out");
+        ros_assoc_failed(wpa_s, wpa_s->pending_bssid, "Association timed out");
 	//wpa_supplicant_req_scan(wpa_s, 5, 0);
 }
 

@@ -10,7 +10,7 @@ void ros_add_iface(struct wpa_global *global, struct wpa_supplicant *wpa_s);
 void ros_remove_iface(struct wpa_global *global, struct wpa_supplicant *wpa_s);
 void ros_do_work(int, void *, void *);
 void ros_scan_completed(struct wpa_supplicant *wpa_s, struct wpa_scan_results *scan_res);
-void ros_assoc_success(struct wpa_supplicant *wpa_s);
-void ros_assoc_failed(struct wpa_supplicant *wpa_s, const char *reason);
+void ros_assoc_success(struct wpa_supplicant *wpa_s, const u8* bssid);
+void ros_assoc_failed(struct wpa_supplicant *wpa_s, const u8* bssid, const char *reason);
 
 #endif

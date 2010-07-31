@@ -171,15 +171,25 @@ public:
     }
   }
 
-  void assocFailed(const char *s)
+  void assocFailed(const u8 *bssid, const char *s)
   {
     ROS_INFO("assocFailed");
     boost::mutex::scoped_lock(associate_mutex_);
+    
+    if (active_association_ == null_associate_goal_handle_)
+      ROS_ERROR("Got disassociation with no active association on BSSID: " MACSTR " (%s)", MAC2STR(bssid), s);
+    else if (os_memcmp(bssid, &active_association_.getGoal()->bss.bssid[0], ETH_ALEN) &&
+        !is_zero_ether_addr(bssid))
+    {
+      ROS_ERROR("Got disassociation on unexpected BSSID: " MACSTR " (%s)", MAC2STR(bssid), s);
+    }
+    
     active_association_.setAborted();
-    stopActiveAssociation(false);
+    active_association_ = null_associate_goal_handle_;
+    lockedAssociateWork();
   }
   
-  void assocSucceeded()
+  void assocSucceeded(const u8 *bssid)
   {
     ROS_INFO("assocSucceeded");
     boost::mutex::scoped_lock(associate_mutex_);
@@ -198,15 +208,13 @@ private:
       ros_global.addWork(boost::bind(&ros_api::associateWork, this));
   }
 
-  void stopActiveAssociation(bool disassociate = true)
+  void stopActiveAssociation()
   {
     ROS_INFO("stopActiveAssociation()");
     if (active_association_ == null_associate_goal_handle_)
       ROS_ERROR("stopActiveAssociation called with no active association.");
     
-    if (disassociate)
-      wpa_supplicant_disassociate(wpa_s_, WLAN_REASON_DEAUTH_LEAVING);
-    active_association_ = null_associate_goal_handle_;
+    wpa_supplicant_disassociate(wpa_s_, WLAN_REASON_DEAUTH_LEAVING);
   }
 
   void startActiveAssociation(AssociateActionServer::GoalHandle &gh)
@@ -239,7 +247,13 @@ private:
     }
     else
     {
-      ROS_ERROR("startActiveAssociation could not find requested bss, ssid or frequency.");
+      if (!bss)
+        ROS_ERROR("startActiveAssociation could not find requested bss.");
+      if (!ssid)
+        ROS_ERROR("startActiveAssociation could not find requested ssid.");
+      if (goal->bss.frequency != bss->freq)
+        ROS_ERROR("startActiveAssociation could not find requested frequency %i MHz instead of %i MHz.", 
+            goal->bss.frequency, bss->freq);
       gh.setRejected();
     }
   }
@@ -247,7 +261,11 @@ private:
   void associateWork()
   {
     boost::mutex::scoped_lock(associate_mutex_);
+    lockedAssociateWork();
+  }
 
+  void lockedAssociateWork()
+  {
     associate_work_requested_ = false;
 
     while (!associate_cancel_queue_.empty())
@@ -255,8 +273,12 @@ private:
       AssociateActionServer::GoalHandle gh = associate_cancel_queue_.front();
       associate_cancel_queue_.pop();
       if (gh == active_association_)
+      {
         stopActiveAssociation();
-      gh.setCanceled();
+        return; // We will get called when the disassociate completes.
+      }
+      else
+        gh.setCanceled();
     }
 
     while (associate_goal_queue_.size() > 1)
@@ -505,14 +527,14 @@ void ros_do_work(int, void *, void *)
   ros_global.doWork();
 }
 
-void ros_assoc_failed(wpa_supplicant *wpa_s, const char *reason)
+void ros_assoc_failed(wpa_supplicant *wpa_s, const u8 *bssid, const char *reason)
 {
-  wpa_s->ros_api->assocFailed(reason);
+  wpa_s->ros_api->assocFailed(bssid, reason);
 }
 
-void ros_assoc_success(wpa_supplicant *wpa_s)
+void ros_assoc_success(wpa_supplicant *wpa_s, const u8 *bssid)
 {
-  wpa_s->ros_api->assocSucceeded();
+  wpa_s->ros_api->assocSucceeded(bssid);
 }
 
 } // extern "C"

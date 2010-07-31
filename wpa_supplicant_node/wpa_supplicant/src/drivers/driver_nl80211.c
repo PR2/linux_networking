@@ -113,6 +113,8 @@ struct wpa_driver_nl80211_data {
 
 	struct i802_bss first_bss;
 
+        int deauth_before_reauth;
+
 #ifdef HOSTAPD
 	int eapol_sock; /* socket for EAPOL frames */
 
@@ -716,6 +718,19 @@ static void mlme_event_deauth_disassoc(struct wpa_driver_nl80211_data *drv,
                          */
                         wpa_printf(MSG_DEBUG, "nl80211: Deauth received "
                                    "from Unknown BSSID " MACSTR " -- ignoring",
+                                   MAC2STR(bssid));
+                        return;
+                }
+                
+                if (drv->deauth_before_reauth && type == EVENT_DEAUTH) {
+                        /*
+                         * Authentication returned EAGAIN so we are doing a
+                         * deauthenticate followed by reauthenticate. We
+                         * can ignore this event.
+                         */
+                        drv->deauth_before_reauth = 0;
+                        wpa_printf(MSG_DEBUG, "nl80211: Deauth received "
+                                   "as expected (from " MACSTR ") -- ignoring",
                                    MAC2STR(bssid));
                         return;
                 }
@@ -2472,6 +2487,7 @@ retry:
 			 * authentication if we are already authenticated. As a
 			 * workaround, force deauthentication and try again.
 			 */
+                        drv->deauth_before_reauth = 1;
 			wpa_printf(MSG_DEBUG, "nl80211: Retry authentication "
 				   "after forced deauthentication");
 			wpa_driver_nl80211_deauthenticate(

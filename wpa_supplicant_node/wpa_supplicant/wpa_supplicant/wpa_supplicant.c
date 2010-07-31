@@ -203,7 +203,7 @@ static void wpa_supplicant_timeout(void *eloop_ctx, void *timeout_ctx)
 	wpa_sm_notify_disassoc(wpa_s->wpa);
 	wpa_supplicant_disassociate(wpa_s, WLAN_REASON_DEAUTH_LEAVING);
 	wpa_s->reassociate = 1;
-        ros_assoc_failed(wpa_s, "Authentication process timed out");
+        ros_assoc_failed(wpa_s, bssid, "Authentication process timed out");
 	//wpa_supplicant_req_scan(wpa_s, 0, 0);
 }
 
@@ -533,7 +533,7 @@ void wpa_supplicant_set_state(struct wpa_supplicant *wpa_s,
 		wpa_supplicant_notify_scanning(wpa_s, 0);
 
 	if (state == WPA_COMPLETED && wpa_s->new_connection) {
-                ros_assoc_success(wpa_s);
+                ros_assoc_success(wpa_s, wpa_s->bssid);
 #if defined(CONFIG_CTRL_IFACE) || !defined(CONFIG_NO_STDOUT_DEBUG)
 		struct wpa_ssid *ssid = wpa_s->current_ssid;
 		wpa_msg(wpa_s, MSG_INFO, WPA_EVENT_CONNECTED "- Connection to "
