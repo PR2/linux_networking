@@ -134,8 +134,8 @@ private:
 public:
   ros_api(const ros::NodeHandle &nh, wpa_supplicant *wpa_s) :
     wpa_s_(wpa_s),
-    sas_(nh, std::string(wpa_s->ifname) + "/scan",      boost::bind(&ros_api::scanGoalCallback,      this, _1), boost::bind(&ros_api::scanCancelCallback,      this, _1), true),
-    aas_(nh, std::string(wpa_s->ifname) + "/associate", boost::bind(&ros_api::associateGoalCallback, this, _1), boost::bind(&ros_api::associateCancelCallback, this, _1), true)
+    sas_(ros::NodeHandle(nh, wpa_s->ifname), "scan",      boost::bind(&ros_api::scanGoalCallback,      this, _1), boost::bind(&ros_api::scanCancelCallback,      this, _1), true),
+    aas_(ros::NodeHandle(nh, wpa_s->ifname), "associate", boost::bind(&ros_api::associateGoalCallback, this, _1), boost::bind(&ros_api::associateCancelCallback, this, _1), true)
   {
   }
 
@@ -177,7 +177,11 @@ public:
     boost::mutex::scoped_lock(associate_mutex_);
     
     if (active_association_ == null_associate_goal_handle_)
+    {
       ROS_ERROR("Got disassociation with no active association on BSSID: " MACSTR " (%s)", MAC2STR(bssid), s);
+      lockedAssociateWork();
+      return;
+    }
     else if (os_memcmp(bssid, &active_association_.getGoal()->bss.bssid[0], ETH_ALEN) &&
         !is_zero_ether_addr(bssid))
     {

@@ -62,7 +62,7 @@ class Test:
             #rospy.sleep(rospy.Duration(2.2))
     
             self.assoc_action.cancel_goal()
-            rospy.sleep(rospy.Duration(.3))
+            rospy.sleep(rospy.Duration(1))
     
             if self.assoc_count > 1:
                 rospy.logerr("Got multiple association feedbacks.")
@@ -81,16 +81,20 @@ if __name__ == '__main__':
         iface = 'wlan0'
         t = Test(iface)                  
         while True:
-            result = t.scan(['willow'], [2437])
+            result = t.scan([], [2437, 5240])
             #print result
             for i in range(0,5):
                 for bss in result.bss:
                     if rospy.is_shutdown():
                         raise KeyboardInterrupt
-                    if bss.ssid == 'blaise-test': # and bssid_to_str(bss.bssid) == "00:24:6C:81:D5:E8":
-                        print "Willow found. Associating..."
-                        if not t.associate(bss):
-                            raise KeyboardInterrupt
+                    #if bssid_to_str(bss.bssid) == "00:24:6C:81:D5:E8":
+                    if bss.ssid == 'blaise-test': 
+#                    if bssid_to_str(bss.bssid) == "00:24:6C:81:D5:E8" or \
+#                      bss.ssid == 'blaise-test': 
+                        print "Network found. Associating... %s %s %i"%(bss.ssid, bssid_to_str(bss.bssid), bss.frequency)
+                        t.associate(bss)
+                        #if not t.associate(bss):
+                        #    raise KeyboardInterrupt
                         #while t.associate(bss):
                         #    pass
                         print "Successes: %i/%i"%(t.assoc_successes, t.assoc_tries)
