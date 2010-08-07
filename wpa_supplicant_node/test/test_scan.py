@@ -40,7 +40,7 @@ class Test:
     def associated(self, feedback):
         if feedback.associated:
             end = rospy.get_time()
-            rospy.loginfo("Association took %.3s seconds."%(end - self.assoc_start))
+            rospy.loginfo("Association took %.3f seconds."%(end - self.assoc_start))
             self.assoc_count += 1
     
     def associate(self, bss):
@@ -67,7 +67,7 @@ class Test:
             if self.assoc_count > 1:
                 rospy.logerr("Got multiple association feedbacks.")
             
-            if self.assoc_count == 1:
+            if self.assoc_count == 1: 
                 self.assoc_successes += 1
                 return True
 
@@ -78,19 +78,28 @@ if __name__ == '__main__':
         # Initializes a rospy node so that the SimpleActionClient can
         # publish and subscribe over ROS.
         rospy.init_node('test_scan')
-        iface = 'wlan0'
+        iface = 'wlan1'
         t = Test(iface)                  
         while True:
-            result = t.scan([], [2437, 5240])
+            result = t.scan([], [2437, 2462, 5240, 5765])
             #print result
             for i in range(0,5):
                 for bss in result.bss:
                     if rospy.is_shutdown():
                         raise KeyboardInterrupt
-                    #if bssid_to_str(bss.bssid) == "00:24:6C:81:D5:E8":
-                    if bss.ssid == 'blaise-test': 
-#                    if bssid_to_str(bss.bssid) == "00:24:6C:81:D5:E8" or \
-#                      bss.ssid == 'blaise-test': 
+                    bssidlist = [
+                      #"00:24:6C:81:4E:FA", # willow-wpa2
+                      #"00:24:6C:81:D5:E0", # willow
+                      "00:24:6C:81:D5:EA", # willow-wpa2
+                      "00:24:6C:81:D5:E8", # willow
+                      ]
+                    essidlist = [
+                      #"willow-wpa2",
+                      #"blaise-test",
+                      #"willow",
+                      ]
+                    if bssid_to_str(bss.bssid) in bssidlist or \
+                       bss.ssid in essidlist:
                         print "Network found. Associating... %s %s %i"%(bss.ssid, bssid_to_str(bss.bssid), bss.frequency)
                         t.associate(bss)
                         #if not t.associate(bss):
