@@ -1,5 +1,5 @@
 #! /bin/bash
-IFACE=wlan1
+IFACE=wlan0
 ESSID=blaise-test
 FREQ=2437
 

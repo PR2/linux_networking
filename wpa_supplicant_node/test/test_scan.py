@@ -78,7 +78,7 @@ if __name__ == '__main__':
         # Initializes a rospy node so that the SimpleActionClient can
         # publish and subscribe over ROS.
         rospy.init_node('test_scan')
-        iface = 'wlan1'
+        iface = 'wlan0'
         t = Test(iface)                  
         while True:
             result = t.scan([], [2437, 2462, 5240, 5765])
