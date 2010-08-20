@@ -62,7 +62,7 @@ class Test:
             #rospy.sleep(rospy.Duration(2.2))
     
             self.assoc_action.cancel_goal()
-            rospy.sleep(rospy.Duration(1))
+            rospy.sleep(rospy.Duration(2.5))
     
             if self.assoc_count > 1:
                 rospy.logerr("Got multiple association feedbacks.")
@@ -78,10 +78,13 @@ if __name__ == '__main__':
         # Initializes a rospy node so that the SimpleActionClient can
         # publish and subscribe over ROS.
         rospy.init_node('test_scan')
-        iface = 'wlan0'
+        import sys
+        iface = sys.argv[1]
         t = Test(iface)                  
         while True:
             result = t.scan([], [2437, 2462, 5240, 5765])
+            if not result.bss:
+                raise Exception("No scan output!")
             #print result
             for i in range(0,5):
                 for bss in result.bss:
@@ -90,12 +93,12 @@ if __name__ == '__main__':
                     bssidlist = [
                       #"00:24:6C:81:4E:FA", # willow-wpa2
                       #"00:24:6C:81:D5:E0", # willow
-                      "00:24:6C:81:D5:EA", # willow-wpa2
+                      #"00:24:6C:81:D5:EA", # willow-wpa2
                       "00:24:6C:81:D5:E8", # willow
                       ]
                     essidlist = [
                       #"willow-wpa2",
-                      #"blaise-test",
+                      "blaise-test",
                       #"willow",
                       ]
                     if bssid_to_str(bss.bssid) in bssidlist or \
