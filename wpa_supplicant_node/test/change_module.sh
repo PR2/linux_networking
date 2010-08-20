@@ -13,10 +13,15 @@ case $1 in
   sta)
     MOD=rt2870sta
     DEV=ra0
+  ;;
   usb)
     MOD=rt2800usb
     DEV=wlan1
+  ;;
   *)
+    echo No argument, should be sta or usb.
+    exit 1
+  ;;
 
 sleep 1
 modprobe $MOD
