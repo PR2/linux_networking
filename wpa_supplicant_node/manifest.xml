@@ -13,7 +13,6 @@
   <rosdep name="libpcsclite-dev"/>
   <rosdep name="libnl-dev"/>
   <rosdep name="libreadline-dev"/>
-  <rosdep name="actionlib"/>
 </package>
 
 
