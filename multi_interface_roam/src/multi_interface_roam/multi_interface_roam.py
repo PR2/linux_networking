@@ -140,12 +140,12 @@ def safe_shutdown(method, *args, **nargs):
 class System:
     def __init__(self, arg):
         #print arg
-        self.errcode = subprocess.call(arg.split(), stdout = null_file, stderr = null_file)
+        self.errcode = subprocess.call(arg.split(), stdout = null_file, stderr = null_file, close_fds = True)
         #self.errcode = os.system(arg + " 2>&1 > /dev/null")
 
 class RunCommand:
     def __init__(self, *args):
-        proc = subprocess.Popen(list(args), stdout = subprocess.PIPE, stderr = subprocess.PIPE)
+        proc = subprocess.Popen(list(args), stdout = subprocess.PIPE, stderr = subprocess.PIPE, close_fds = True)
         (self.stdout, self.stderr) = proc.communicate()
 
 class CommandWithOutput(threading.Thread):
@@ -177,7 +177,7 @@ class CommandWithOutput(threading.Thread):
                             
     def start_proc(self):
         try:
-            self.proc = subprocess.Popen(self.proc_args, stdout = subprocess.PIPE, stderr = subprocess.STDOUT)
+            self.proc = subprocess.Popen(self.proc_args, stdout = subprocess.PIPE, stderr = subprocess.STDOUT, close_fds = True)
             flags = fcntl.fcntl(self.proc.stdout, fcntl.F_GETFL)
             fcntl.fcntl(self.proc.stdout, fcntl.F_SETFL, flags| os.O_NONBLOCK)
             self.child_restart()
