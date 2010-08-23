@@ -27,6 +27,7 @@ def connect(iface, essid, freq, bssid, network_id):
     if network_id is None:
         call(['iw', 'dev', iface, 'connect', essid, freq, bssid])
     else:
+        wpa_cli(iface, ['select_network', network_id])
         wpa_cli(iface, ['bssid', network_id, bssid])
         wpa_cli(iface, ['reconnect'])
 
@@ -68,6 +69,7 @@ def cycle_test(iface, essid, freq, bssid, network_id):
         time.sleep(0.5)
         
         print "Associating...",
+        sys.stdout.flush()
         connect(iface, essid, freq, bssid, network_id)
         if not wait_connect_state(iface, True):
             print "FAIL.",
@@ -80,4 +82,4 @@ def cycle_test(iface, essid, freq, bssid, network_id):
 
 # Parameters are all strings:
 # interface, essid, frequency, bssid, wpa_supplicant network id. 
-cycle_test('wlan1', 'blaise-test', '2437', '00:24:6c:81:bf:82', '1')
+cycle_test('wlan2', 'blaise-test', '5240', '00:25:9C:C4:D7:7E', '0')
