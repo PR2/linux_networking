@@ -1,7 +1,8 @@
 #! /bin/bash
-IFACE=wlan0
+IFACE=$1
 ESSID=blaise-test
 FREQ=2437
+FREQ=
 
 echo Resetting interface...
 ifconfig $IFACE down

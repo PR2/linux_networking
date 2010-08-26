@@ -1,5 +1,5 @@
-TEST_NUM=1 # Interface under test
-MONI_NUM=0 # Monitoring interface
+TEST_NUM=2 # Interface under test
+MONI_NUM=1 # Monitoring interface
 FREQ=2437 # Frequency for the monitoring interface to monitor
 
 

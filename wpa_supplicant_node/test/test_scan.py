@@ -28,9 +28,11 @@ class Test:
             goal.frequencies.append(f)
         
         start = rospy.get_time()
-        rospy.loginfo("Sending goal.")
+        print "Requesting scan..."
+        #rospy.loginfo("Sending goal.")
         self.scan_action.send_goal(goal)
-        rospy.loginfo("Waiting for result.")
+        print "Requesting scan..."
+        #rospy.loginfo("Waiting for result.")
         self.scan_action.wait_for_result()
         end = rospy.get_time()
         
@@ -48,7 +50,8 @@ class Test:
         self.assoc_count = 0                                 
         self.assoc_tries += 1
 
-        rospy.loginfo("Associating to %s:"%bssid_to_str(bss.bssid))
+        #rospy.loginfo("Associating to %s:"%bssid_to_str(bss.bssid))
+        print "Associating to %12s %s %4i"%(bss.ssid, bssid_to_str(bss.bssid), bss.frequency),
         self.assoc_action.send_goal(wpa_supplicant_node.msg.AssociateGoal(bss), feedback_cb=self.associated)
         failed = False
         while not self.assoc_count:
@@ -62,9 +65,10 @@ class Test:
             #rospy.sleep(rospy.Duration(2.2))
     
             self.assoc_action.cancel_goal()
-            rospy.sleep(rospy.Duration(2.5))
+            rospy.sleep(rospy.Duration(0.5))
     
             if self.assoc_count > 1:
+                print
                 rospy.logerr("Got multiple association feedbacks.")
             
             if self.assoc_count == 1: 
@@ -103,15 +107,16 @@ if __name__ == '__main__':
                       ]
                     if bssid_to_str(bss.bssid) in bssidlist or \
                        bss.ssid in essidlist:
-                        print "Network found. Associating... %s %s %i"%(bss.ssid, bssid_to_str(bss.bssid), bss.frequency)
+                        #print "Network found. Associating... %s %s %i"%(bss.ssid, bssid_to_str(bss.bssid), bss.frequency)
                         t.associate(bss)
                         #if not t.associate(bss):
                         #    raise KeyboardInterrupt
                         #while t.associate(bss):
                         #    pass
                         print "Successes: %i/%i"%(t.assoc_successes, t.assoc_tries)
-                        if t.assoc_tries >= 1000:
-                            raise KeyboardInterrupt
+                        sys.stdout.flush()
+                        #if t.assoc_tries >= 1000:
+                        #    raise KeyboardInterrupt
                     #else:
                     #    print "skipping", bssid_to_str(bss.bssid)
 

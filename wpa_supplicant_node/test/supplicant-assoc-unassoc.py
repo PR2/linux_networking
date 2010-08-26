@@ -10,7 +10,7 @@ import time
 import sys
 
 def call(cmd):
-    #print "\nCMD-->", "'"+("' '".join(cmd))+"'"
+    print "\nCMD-->", "'"+("' '".join(cmd))+"'"
     with open('/dev/null', 'w') as dev_null:
         subprocess.call(cmd, stdout = dev_null)
 
@@ -27,8 +27,8 @@ def connect(iface, essid, freq, bssid, network_id):
     if network_id is None:
         call(['iw', 'dev', iface, 'connect', essid, freq, bssid])
     else:
-        wpa_cli(iface, ['select_network', network_id])
-        wpa_cli(iface, ['bssid', network_id, bssid])
+        #wpa_cli(iface, ['select_network', network_id])
+        #wpa_cli(iface, ['bssid', network_id, bssid])
         wpa_cli(iface, ['reconnect'])
 
 def is_connected(iface):
