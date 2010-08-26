@@ -7,6 +7,11 @@
 #include <queue>                  
 #include <wpa_supplicant_node/ScanAction.h>
 #include <wpa_supplicant_node/AssociateAction.h>
+#include <wpa_supplicant_node/AddNetwork.h>
+#include <wpa_supplicant_node/RemoveNetwork.h>
+#include <wpa_supplicant_node/SetNetworkState.h>
+#include <wpa_supplicant_node/SetNetworkParameter.h>
+
 
 extern "C" {
 #include <includes.h>
@@ -24,13 +29,29 @@ extern "C" {
 
 typedef boost::function<void ()> WorkFunction;
 
-static class {
+static class ros_api {
   //int eloop_pid_;
   bool initialized_;
   std::queue<WorkFunction> work_queue_;
   boost::mutex mutex_;
+  boost::condition_variable main_thread_cv_;
+  typedef enum main_thread_states { MAIN_THREAD_NOT_WAITING, MAIN_THREAD_WAITING, MAIN_THREAD_PAUSED };
+  volatile main_thread_states main_thread_state_;
   int pipefd[2];
   boost::shared_ptr<boost::thread> ros_spin_loop_;
+  volatile bool shutting_down_;
+
+  // Services
+  ros::ServiceServer add_network_service_;
+  ros::ServiceServer remove_network_service_;
+  ros::ServiceServer set_network_state_service_;
+  ros::ServiceServer set_network_parameter_service_;
+
+  ros_api()
+  {
+    shutting_down_ = false;
+    main_thread_state_ = MAIN_THREAD_NOT_WAITING;
+  }
 
 public:
   void doWork()
@@ -38,8 +59,9 @@ public:
     char buffer[16]; // Any non-zero size is fine here.
 
     ROS_INFO("doWork()");
-
-    boost::mutex::scoped_lock(mutex_);
+    
+    boost::mutex::scoped_lock lock(mutex_);
+    mainThreadWait();
 
     int bytes;
     do {
@@ -60,9 +82,14 @@ public:
 
     ROS_INFO("addWork()");
     
-    boost::mutex::scoped_lock(mutex_);
+    boost::mutex::scoped_lock lock(mutex_);
 
     work_queue_.push(f);
+    triggerWork();
+  }     
+
+  void triggerWork()
+  {
     if (write(pipefd[1], dummy, 1) != 1)
       ROS_ERROR("addWork Failed to write to wakeup pipe.");
   }
@@ -81,9 +108,93 @@ public:
     ros::init(*argc, *argv, "wpa_supplicant", ros::init_options::NoSigintHandler);
     ros_spin_loop_.reset(new boost::thread(boost::bind(&ros::spin)));
 
+    ros::NodeHandle nh;
+    add_network_service_ = nh.advertiseService("add_network", &ros_api::addNetwork, this);
+    remove_network_service_ = nh.advertiseService("remove_network", &ros_api::removeNetwork, this);
+    set_network_state_ = nh.advertiseService("set_network_state", &ros_api::setNetworkState, this);
+    set_network_parameter_ = nh.advertiseService("set_network_parameter", &ros_api::setNetworkParameter, this);
+
     return 0;
   }
+ 
+  void publishNetworks()
+  {
+  }
+
+  void waitForMainThreadState(main_thread_state target, boost::mutex::scoped_lock &lock)
+  {
+    while (main_thread_state_ != target && !shutting_down_)
+    {
+      main_thrad_cv_.notify_one();
+      main_thrad_cv_.wait(lock);
+    }
+  }
+
+  bool waitForMainThread(boost::mutex::scoped_lock &lock)
+  { // Call with mutex_ held. Returns with main thread waiting.
+    main_thread_state_ = MAIN_THREAD_WAITING;
+    waitForMainThread(MAIN_THREAD_PAUSED);
+    main_thread_state_ = MAIN_THREAD_NOT_WAITING;
+    return !shutting_down_;
+  }
   
+  void mainThreadWait(boost::mutex::scoped_lock &lock)
+  { // If somebody waiting for us, let them make progress.
+    if (main_thread_state_ == MAIN_THREAD_WAITING)
+    {
+      main_thread_state_ = MAIN_THREAD_PAUSED;
+      waitForMainThreadState(MAIN_THREAD_PAUSED, lock);
+    }
+  }
+
+  bool addNetwork(wpa_supplicant_node::AddNetwork::Request &req, wpa_supplicant_node::AddNetwork::Response &rsp)
+  {
+    ROS_INFO("addNetwork");
+    
+    boost::mutex::scoped_lock lock(mutex_);
+    if (!waitForMainThread(lock))
+      return false;
+  
+
+    return true;
+  }
+
+  bool removeNetwork(wpa_supplicant_node::RemoveNetwork::Request &req, wpa_supplicant_node::RemoveNetwork::Response &rsp)
+  {
+    ROS_INFO("removeNetwork");
+    
+    boost::mutex::scoped_lock lock(mutex_);
+    if (!waitForMainThread(lock))
+      return false;
+    
+    
+    return true;
+  }
+
+  bool setNetworkState(wpa_supplicant_node::SetNetworkState::Request &req, wpa_supplicant_node::SetNetworkState::Response &rsp)
+  {
+    ROS_INFO("setNetworkState");
+    
+    boost::mutex::scoped_lock lock(mutex_);
+    if (!waitForMainThread(lock))
+      return false;
+    
+
+    return true;
+  }
+
+  bool setNetworkParameter(wpa_supplicant_node::SetNetworkParameter::Request &req, wpa_supplicant_node::SetNetworkParameter::Response &rsp)
+  {
+    ROS_INFO("setNetworkParameter");
+    
+    boost::mutex::scoped_lock lock(mutex_);
+    if (!waitForMainThread(lock))
+      return false;
+    
+
+    return true;
+  }
+
   void init2()
   {
     ROS_INFO("ros_init");
@@ -94,6 +205,10 @@ public:
   {
     ROS_INFO("ros_deinit");
   
+    boost::mutex::scoped_lock lock(mutex_);
+    shutting_down_ = true;
+    mainThreadWait();
+
     ros::shutdown(); 
     // FIXME Need to wait for shutdown to complete?
   
@@ -111,10 +226,12 @@ typedef actionlib::ActionServer<wpa_supplicant_node::AssociateAction> AssociateA
 const ScanActionServer     ::GoalHandle null_scan_goal_handle_;
 const AssociateActionServer::GoalHandle null_associate_goal_handle_;
 
-struct ros_api
+struct ros_interface
 {
 private:
   wpa_supplicant *wpa_s_;
+  
+  ros::NodeHandle nh_;
 
 //Scan Action
   boost::mutex scan_mutex_;
@@ -130,12 +247,13 @@ private:
   bool associate_work_requested_;
   std::queue<AssociateActionServer::GoalHandle> associate_goal_queue_;
   std::queue<AssociateActionServer::GoalHandle> associate_cancel_queue_;
-  
+
 public:
-  ros_api(const ros::NodeHandle &nh, wpa_supplicant *wpa_s) :
+  ros_interface(const ros::NodeHandle &nh, wpa_supplicant *wpa_s) :
     wpa_s_(wpa_s),
-    sas_(ros::NodeHandle(nh, wpa_s->ifname), "scan",      boost::bind(&ros_api::scanGoalCallback,      this, _1), boost::bind(&ros_api::scanCancelCallback,      this, _1), true),
-    aas_(ros::NodeHandle(nh, wpa_s->ifname), "associate", boost::bind(&ros_api::associateGoalCallback, this, _1), boost::bind(&ros_api::associateCancelCallback, this, _1), true)
+    nh_(ros::NodeHandle(nh, wpa_s->ifname)
+    sas_(nh_, "scan",      boost::bind(&ros_interface::scanGoalCallback,      this, _1), boost::bind(&ros_interface::scanCancelCallback,      this, _1), true),
+    aas_(nh_, "associate", boost::bind(&ros_interface::associateGoalCallback, this, _1), boost::bind(&ros_interface::associateCancelCallback, this, _1), true)
   {
   }
 
@@ -147,7 +265,7 @@ public:
   {
     ROS_INFO("scanCompleted");
 
-    boost::mutex::scoped_lock(scan_mutex_);
+    boost::mutex::scoped_lock lock(scan_mutex_);
     
     if (current_scan_ == null_scan_goal_handle_)
       ROS_ERROR("scanCmopleted with current_scan_ not set.");
@@ -174,7 +292,7 @@ public:
   void assocFailed(const u8 *bssid, const char *s)
   {
     ROS_INFO("assocFailed");
-    boost::mutex::scoped_lock(associate_mutex_);
+    boost::mutex::scoped_lock lock(associate_mutex_);
     
     if (active_association_ == null_associate_goal_handle_)
     {
@@ -196,7 +314,7 @@ public:
   void assocSucceeded(const u8 *bssid)
   {
     ROS_INFO("assocSucceeded");
-    boost::mutex::scoped_lock(associate_mutex_);
+    boost::mutex::scoped_lock lock(associate_mutex_);
 
     wpa_supplicant_node::AssociateFeedback fbk;
     fbk.associated = true;
@@ -209,7 +327,7 @@ private:
   void requestAssociateWork()
   {
       associate_work_requested_ = true;
-      ros_global.addWork(boost::bind(&ros_api::associateWork, this));
+      ros_global.addWork(boost::bind(&ros_interface::associateWork, this));
   }
 
   void stopActiveAssociation()
@@ -239,8 +357,8 @@ private:
     if (bss && ssid && goal->bss.frequency == bss->freq)
     {
       ROS_INFO("wpa_s in startActiveAssociation: %p", wpa_s_);
-      ROS_INFO("wpa_s.ros in startActiveAssociation: %p", wpa_s_->ros_api);
-      ROS_INFO("&wpa_s.ros_api in startActiveAssociation: %p", &wpa_s_->ros_api);
+      ROS_INFO("wpa_s.ros in startActiveAssociation: %p", wpa_s_->ros_interface);
+      ROS_INFO("&wpa_s.ros_interface in startActiveAssociation: %p", &wpa_s_->ros_interface);
       ROS_INFO("sizeof(wpa_s) in startActiveAssociation: %zi", sizeof(*wpa_s_));
       gh.setAccepted();
       active_association_ = gh;
@@ -264,7 +382,7 @@ private:
 
   void associateWork()
   {
-    boost::mutex::scoped_lock(associate_mutex_);
+    boost::mutex::scoped_lock lock(associate_mutex_);
     lockedAssociateWork();
   }
 
@@ -312,7 +430,7 @@ private:
 
   void associateGoalCallback(AssociateActionServer::GoalHandle &gh)
   {
-    boost::mutex::scoped_lock(associate_mutex_);
+    boost::mutex::scoped_lock lock(associate_mutex_);
     
     associate_goal_queue_.push(gh);
     requestAssociateWork();
@@ -320,7 +438,7 @@ private:
 
   void associateCancelCallback(AssociateActionServer::GoalHandle &gh)
   {
-    boost::mutex::scoped_lock(associate_mutex_);
+    boost::mutex::scoped_lock lock(associate_mutex_);
     
     associate_cancel_queue_.push(gh);
     requestAssociateWork();
@@ -351,25 +469,25 @@ private:
 
   void scanGoalCallback(ScanActionServer::GoalHandle &gh)
   {
-    boost::mutex::scoped_lock(scan_mutex_);
+    boost::mutex::scoped_lock lock(scan_mutex_);
     
     ROS_INFO("scanGoalCallback()");
 
     scan_queue_.push(gh);
 
     if (current_scan_ == null_scan_goal_handle_)
-      ros_global.addWork(boost::bind(&ros_api::scanTryActivate, this));
+      ros_global.addWork(boost::bind(&ros_interface::scanTryActivate, this));
   }
 
   void scanCancelCallback(ScanActionServer::GoalHandle &gh)
   {
-    boost::mutex::scoped_lock(scan_mutex_);
+    boost::mutex::scoped_lock lock(scan_mutex_);
 
     unsigned int status = gh.getGoalStatus().status;
 
     if (current_scan_ == gh)
     {
-      ros_global.addWork(boost::bind(&ros_api::scanCancel, this, gh));
+      ros_global.addWork(boost::bind(&ros_interface::scanCancel, this, gh));
     }
     else
     {
@@ -382,7 +500,7 @@ private:
   void scanCancel(ScanActionServer::GoalHandle &gh)
   {
     ROS_INFO("scanCancel()");
-    boost::mutex::scoped_lock(scan_mutex_);
+    boost::mutex::scoped_lock lock(scan_mutex_);
     
     // Are we still active (we may have succeeded before getting here)?
     if (current_scan_ == gh)
@@ -478,7 +596,7 @@ private:
 
   void scanTryActivate()
   {
-    boost::mutex::scoped_lock(scan_mutex_);
+    boost::mutex::scoped_lock lock(scan_mutex_);
     lockedScanTryActivate();
   }
 };
@@ -503,27 +621,27 @@ void ros_deinit()
 void ros_add_iface(wpa_global *global, wpa_supplicant *wpa_s)
 {
   ROS_INFO("ros_add_iface");
-  wpa_s->ros_api = new ros_api(ros::NodeHandle(), wpa_s);
+  wpa_s->ros_interface = new ros_interface(ros::NodeHandle(), wpa_s);
   ROS_INFO("wpa_s in ros_add_iface: %p", wpa_s);
-  ROS_INFO("wpa_s.ros in ros_add_iface: %p", wpa_s->ros_api);
+  ROS_INFO("wpa_s.ros in ros_add_iface: %p", wpa_s->ros_interface);
 }
 
 void ros_remove_iface(wpa_global *global, wpa_supplicant *wpa_s)
 {
   ROS_INFO("ros_remove_iface");
-  delete wpa_s->ros_api;
+  delete wpa_s->ros_interface;
 }
 
 void ros_iface_idle(wpa_supplicant *wpa_s)
 {
-  wpa_s->ros_api->ifaceIdle();
+  wpa_s->ros_interface->ifaceIdle();
 }
   
 void ros_scan_completed(wpa_supplicant *wpa_s, wpa_scan_results *scan_res)
 {
   ROS_INFO("wpa_s in ros_scan_completed: %p", wpa_s);
-  ROS_INFO("wpa_s.ros in ros_scan_completed: %p", wpa_s->ros_api);
-  wpa_s->ros_api->scanCompleted(scan_res);
+  ROS_INFO("wpa_s.ros in ros_scan_completed: %p", wpa_s->ros_interface);
+  wpa_s->ros_interface->scanCompleted(scan_res);
 }
 
 void ros_do_work(int, void *, void *)
@@ -533,12 +651,12 @@ void ros_do_work(int, void *, void *)
 
 void ros_assoc_failed(wpa_supplicant *wpa_s, const u8 *bssid, const char *reason)
 {
-  wpa_s->ros_api->assocFailed(bssid, reason);
+  wpa_s->ros_interface->assocFailed(bssid, reason);
 }
 
 void ros_assoc_success(wpa_supplicant *wpa_s, const u8 *bssid)
 {
-  wpa_s->ros_api->assocSucceeded(bssid);
+  wpa_s->ros_interface->assocSucceeded(bssid);
 }
 
 } // extern "C"

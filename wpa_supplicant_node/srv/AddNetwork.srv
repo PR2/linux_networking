@@ -1,0 +1,4 @@
+# Used to create a network.
+--
+bool success
+int32 network_id
