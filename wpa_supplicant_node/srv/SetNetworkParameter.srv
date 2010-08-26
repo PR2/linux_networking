@@ -1,5 +1,0 @@
-int32 network_id
-string key
-string value
---
-bool success

@@ -2166,7 +2166,7 @@ struct wpa_supplicant * wpa_supplicant_add_iface(struct wpa_global *global,
 	wpa_s->next = global->ifaces;
 	global->ifaces = wpa_s;
 
-        ros_add_iface(global, wpa_s);
+        ros_add_iface(wpa_s);
 
 	wpa_printf(MSG_DEBUG, "Added interface %s", wpa_s->ifname);
 
@@ -2190,7 +2190,7 @@ int wpa_supplicant_remove_iface(struct wpa_global *global,
 {
 	struct wpa_supplicant *prev;
 
-        ros_remove_iface(global, wpa_s);
+        ros_remove_iface(wpa_s);
 	
         /* Remove interface from the global list of interfaces */
 	prev = global->ifaces;

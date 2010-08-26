@@ -1,0 +1,4 @@
+int32 network_id
+NetworkParameter[] parameters
+---
+bool success
