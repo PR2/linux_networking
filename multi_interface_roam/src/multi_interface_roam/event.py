@@ -5,12 +5,10 @@ from __future__ import with_statement
 import threading
 import weakref
 
-# TODO:
-# - Safely unsubscribing from a nonrepeating event. Currently you might
-# delete just after a trigger deleted, and a subscribe added with the same
-# id.
-
 class DeadlockException(Exception):
+    pass
+
+class MultipleUnsubscribe(Exception):
     pass
 
 class EventCallbackHandle:
@@ -47,19 +45,35 @@ class EventCallbackHandle:
         with self._call_lock:
             if cb is not None:
                 if not self._repeating:
-                    self.unsubscribe(blocking = False)
+                    self.unsubscribe(blocking = False, _clear_repeating = False)
                 self._running_thread = ct
                 cb(*allargs, **allnargs)
                 self._running_thread = None
     
-    def unsubscribe(self, blocking = True):
+    def unsubscribe(self, blocking = True, _clear_repeating = True):
         # Kill as many references as we can.
+        # Clear _cb first as it is the one that gets checked in _trigger. 
         self._cb = None
+        # If not an automatic unsubscribe then set _repeating to true so
+        # that the next unsubscribe can raise a MultipleUnsubscribe
+        # exception. 
+        if _clear_repeating:
+            self._repeating = True
         self._args = ()
         self._nargs = ()
         event = self._event()
         if event is not None:
-            del event._subscribers[self]
+            try:
+                del event._subscribers[self]
+            except KeyError:
+                # Don't check once callbacks because there is a race
+                # between manual deletion and automatic deletion. If a once
+                # callback is manually cleared, _repeating will be true, so
+                # we will catch the second attempt.
+                if self._repeating:
+                    raise MultipleUnsubscribe("Repeating callback unsubscribed multiple times.")
+                else:
+                    self._repeating = True
         if blocking:
             if self._running_thread == threading.current_thread():
                 raise DeadlockException("Callback tried to blocking unsubscribe itself.")
@@ -184,15 +198,6 @@ if __name__ == "__main__":
             self.t = threading.Thread(target = self.e.trigger, args=['t1'])
             self.t.start()
 
-        def tearDown(self):
-            # Let the trigger finish
-            self.t.join()
-            
-            # Trigger event again
-            self.e.trigger('t2')
-            
-            self.assertEqual(self.l, self.expected)
-
         def test_norun_sub_during_trig(self):
             """Tests that a callback that gets added during a trigger is
             not run."""
@@ -212,6 +217,9 @@ if __name__ == "__main__":
                     self.cv.wait()
                 self.l.append('main2')
                 self.cv.notify_all()
+            
+            # Let the trigger finish
+            self.t.join()
 
             self.expected = [
                 ('cb1', 't1', 'pre'), 
@@ -222,6 +230,11 @@ if __name__ == "__main__":
                 ('cb1', 't1', 'post'), 
                 (('cb2', 't2'), {}),
                 ]
+            
+            # Trigger event again
+            self.e.trigger('t2')
+            
+            self.assertEqual(self.l, self.expected)
 
         def test_norun_unsub_during_trig(self):
             """Tests that a callback that gets deleted during a trigger is
@@ -238,21 +251,29 @@ if __name__ == "__main__":
                 try:
                     self.h1.unsubscribe(blocking = False)
                     unsubed += 1
-                except KeyError:
+                except MultipleUnsubscribe:
                     pass
                 try:
                     self.h2.unsubscribe(blocking = False)
                     unsubed += 1
-                except KeyError:
+                except MultipleUnsubscribe:
                     pass
                 self.assertEqual(unsubed, 1)
                 self.cv.notify_all()
+            
+            # Let the trigger finish
+            self.t.join()
 
             self.expected = [
                 ('cb1', 't1', 'pre'), 
                 'main',
                 ('cb1', 't1', 'post'), 
                 ]
+
+            # Trigger event again
+            self.e.trigger('t2')
+            
+            self.assertEqual(self.l, self.expected)
 
     if False:
         rostest.unitrun('multi_interface_roam', 'event_basic', BasicTest)
