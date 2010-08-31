@@ -3,6 +3,7 @@
 from __future__ import with_statement
 
 import threading
+import weakref
 
 # TODO:
 # - Safely unsubscribing from a nonrepeating event. Currently you might
@@ -13,30 +14,62 @@ class DeadlockException(Exception):
     pass
 
 class EventCallbackHandle:
-    def __init__(self, id, event):
-        self.id = id
-        self._event = event
+    def __init__(self, event, cb, args, nargs, repeating):
+        # Use a weakref to avoid creating a loop for the GC.
+        self._event = weakref.ref(event)
+        self._cb = cb
+        self._args = args
+        self._nargs = nargs
+        self._call_lock = threading.Lock()
+        self._repeating = repeating
+        self._running_thread = None
 
     def __enter__(self):
         return self
 
     def __exit__(self, *args):
-        self._event._unsubscribe(id)
+        self.unsubscribe()
 
+    def _trigger(self, args, nargs):
+        # Prepare the positional parameters
+        allargs = self._args + args
+    
+        # Prepare the named parameters. Parameters given to
+        # the subscribe call have precedence.
+        allnargs = dict(nargs)
+        allnargs.update(self._nargs)
+    
+        # Call the callback
+        cb = self._cb
+        ct = threading.current_thread()
+        if self._running_thread == ct:
+            raise DeadlockException("Callback recursively triggered itself.")
+        with self._call_lock:
+            if cb is not None:
+                if not self._repeating:
+                    self.unsubscribe(blocking = False)
+                self._running_thread = ct
+                cb(*allargs, **allnargs)
+                self._running_thread = None
+    
     def unsubscribe(self, blocking = True):
-        self._event._unsubscribe(self.id, blocking)
+        # Kill as many references as we can.
+        self._cb = None
+        self._args = ()
+        self._nargs = ()
+        event = self._event()
+        if event is not None:
+            del event._subscribers[self]
+        if blocking:
+            if self._running_thread == threading.current_thread():
+                raise DeadlockException("Callback tried to blocking unsubscribe itself.")
+            with self._call_lock:
+                pass
 
 class Event:
     def __init__(self, name = "Unnamed Event"): 
         self._name = name
-        self._subscribers = {} 
-        self._next_id = 0 
-        self._subscribe_lock = threading.Lock() 
-        self._unsubscribe_cv = threading.Condition()
-        self._trigger_lock = threading.Lock()
-        self._running_callback = None
-        self._unsubscribe_list = None
-        self._trigger_thread = None
+        self._subscribers = {}
 
     def subscribe(self, cb, args, nargs, repeating = True):
         """Subscribes to an event. 
@@ -45,20 +78,9 @@ class Event:
         occur while an event is being triggered will not be called until
         the next time the event is triggered."""
 
-        with self._subscribe_lock:
-            # Allocate an id
-            # Fails if each int has been used.
-            # Robust to next_id wrapping around.
-            while self._next_id in self._subscribers:
-                #or \
-                #  self._next_id in self._unsubscribe_list: 
-                self._next_id += 1
-            id = self._next_id
-            self._next_id += 1
-
-            self._subscribers[id] = (cb, args, nargs, repeating)
-    
-            return EventCallbackHandle(id, self)
+        h = EventCallbackHandle(self, cb, args, nargs, repeating)
+        self._subscribers[h] = None
+        return h
     
     def subscribe_once(*args, **nargs):
         # We don't want the names we use to limit what the user can put in
@@ -70,67 +92,17 @@ class Event:
         # nargs. So do all our arguments positional.
         return args[0].subscribe(args[1], args[2:], nargs, repeating = True)
 
-    def _unsubscribe(self, id, blocking = True):
-        with self._unsubscribe_cv:
-            while self._running_cb == id and blocking:
-                if self._trigger_thread == threading.current_thread():
-                    raise DeadlockException("Event callback doing blocking unsubscribe of itself.")
-                self._unsubscribe_cv.wait()
-            del self._subscribers[id]
-            if self._unsubscribe_list is not None:
-                self._unsubscribe_list.append(id)
-
     def trigger(*args, **nargs):
         """Triggers an event.
 
-        Concurrent triggers are serialized using a lock, so triggering from
-        a callback will cause a deadlock."""
+        Concurrent triggers of a given callback are serialized using a lock, so 
+        triggering from a callback will cause a deadlock."""
         
         self = args[0]
         args = args[1:]
 
-        # Clear _unsubscribe_list, as any items currently on it
-        with self._trigger_lock:
-            self._trigger_thread = threading.current_thread()
-            with self._unsubscribe_cv:
-                self._unsubscribe_list = []
-                items = self._subscribers.items()
-            
-            for (id, (cb, cbargs, cbnargs, repeating)) in items:
-                with self._unsubscribe_cv:
-                    # Make a note of the currently running callback
-                    self._running_cb = id
-                    
-                    # Notify waiting unsubscribers that we have changed 
-                    # callback.
-                    self._unsubscribe_cv.notify_all()
-
-                    # Delete the current callback if it doesn't repeat.
-                    if not repeating and id not in self._unsubscribe_list:
-                        del self._subscribers[id]
-
-                # Call the callback unless it has been unsubscribed while
-                # we were triggering.
-                if id not in self._unsubscribe_list:
-                    # Prepare the positional parameters
-                    allargs = cbargs + args
-
-                    # Prepare the named parameters. Parameters given to
-                    # the subscribe call have precedence.
-                    allnargs = dict(nargs)
-                    allnargs.update(cbnargs)
-
-                    # Call the callback
-                    cb(*allargs, **allnargs)
-            
-            with self._unsubscribe_cv:
-                # Make a note that no callback is currently running
-                self._running_cb = None
-
-                # Clear the list of callbacks deleted while we were
-                # triggering.
-                self._unsubscribe_list = None
-            self._trigger_thread = None
+        for h in self._subscribers.keys():
+            h._trigger(args, nargs)
 
 if __name__ == "__main__":
     import roslib; roslib.load_manifest('multi_interface_roam')
@@ -140,13 +112,6 @@ if __name__ == "__main__":
         
     def append_cb(l, *args, **nargs):
         l.append((args, nargs))
-
-    def wait_cv(cv, l, cb, trig):
-        with cv:
-            l.append((cb, trig, 'pre'))
-            cv.notify_all()
-            cv.wait()
-            l.append((cb, trig, 'post'))
 
     class BasicTest(unittest.TestCase):
         def test_basic(self):
@@ -202,6 +167,13 @@ if __name__ == "__main__":
             u.h = e.subscribe_repeating(u.cb)
             self.assertRaises(DeadlockException, e.trigger, ['t1'])
 
+    def wait_cv(cv, l, cb, trig):
+        with cv:
+            l.append((cb, trig, 'pre'))
+            cv.notify_all()
+            cv.wait()
+            l.append((cb, trig, 'post'))
+
     class ThreadTest(unittest.TestCase):
         def setUp(self):
             self.e = Event()
@@ -209,7 +181,17 @@ if __name__ == "__main__":
             self.l = []
             self.h1 = self.e.subscribe_once(wait_cv, self.cv, self.l, 'cb1')
             self.h2 = self.e.subscribe_once(wait_cv, self.cv, self.l, 'cb1')
-            threading.Thread(target = self.e.trigger, args=['t1']).start()
+            self.t = threading.Thread(target = self.e.trigger, args=['t1'])
+            self.t.start()
+
+        def tearDown(self):
+            # Let the trigger finish
+            self.t.join()
+            
+            # Trigger event again
+            self.e.trigger('t2')
+            
+            self.assertEqual(self.l, self.expected)
 
         def test_norun_sub_during_trig(self):
             """Tests that a callback that gets added during a trigger is
@@ -231,10 +213,7 @@ if __name__ == "__main__":
                 self.l.append('main2')
                 self.cv.notify_all()
 
-            # Trigger event again
-            self.e.trigger('t2')
-
-            self.assertEqual(self.l, [
+            self.expected = [
                 ('cb1', 't1', 'pre'), 
                 'main',
                 ('cb1', 't1', 'post'), 
@@ -242,7 +221,7 @@ if __name__ == "__main__":
                 'main2',
                 ('cb1', 't1', 'post'), 
                 (('cb2', 't2'), {}),
-                ])
+                ]
 
         def test_norun_unsub_during_trig(self):
             """Tests that a callback that gets deleted during a trigger is
@@ -269,14 +248,11 @@ if __name__ == "__main__":
                 self.assertEqual(unsubed, 1)
                 self.cv.notify_all()
 
-            # Trigger event again
-            self.e.trigger('t2')
-
-            self.assertEqual(self.l, [
+            self.expected = [
                 ('cb1', 't1', 'pre'), 
                 'main',
                 ('cb1', 't1', 'post'), 
-                ])
+                ]
 
     if False:
         rostest.unitrun('multi_interface_roam', 'event_basic', BasicTest)
