@@ -6,6 +6,8 @@ import threading
 import time
 import traceback
 
+# TODO 
+# Make this autoshutdown when there are no references.
 
 # FIXME Move this elsewhere.
 import subprocess
@@ -16,14 +18,16 @@ class RunCommand:
 
 class NetlinkMonitor(command_with_output.CommandWithOutput):
     IFSTATE_PLUGGED = 0
-    IFSTATE_UP = 1
-    IFSTATE_LINK = 2
-    IFSTATE_ADDR = 3
+    IFSTATE_UP = IFSTATE_PLUGGED + 1
+    IFSTATE_LINK = IFSTATE_UP + 1
+    IFSTATE_LINK_ADDR = IFSTATE_LINK + 1
+    IFSTATE_ADDR = IFSTATE_LINK_ADDR + 1
+    IFSTATE_COUNT = IFSTATE_ADDR + 1
 
     def __init__(self):
         self.lock = threading.RLock()
-        self.raw_state_publishers = [{}, {}, {}, {}]
-        self.state_publishers = [{}, {}, {}, {}]
+        self.raw_state_publishers = [ {} for i in range(0, self.IFSTATE_COUNT)]
+        self.state_publishers = [ {} for i in range(0, self.IFSTATE_COUNT)]
         self.cur_iface = None
         self.deleted = None
         command_with_output.CommandWithOutput.__init__(self, ['ip', 'monitor', 'link', 'addr'], 'ip_monitor')
@@ -45,7 +49,7 @@ class NetlinkMonitor(command_with_output.CommandWithOutput):
         pubs =  self.state_publishers[level]
         if not interface in pubs:
             pubs[interface] = state_publisher.CompositeStatePublisher(lambda l: l[0] and l[1], [
-                    self.get_raw_state_publisher(interface, level - 1),
+                    self.get_state_publisher(interface, level - 1),
                     self.get_raw_state_publisher(interface, level), 
                     ])
         return pubs[interface]
@@ -87,21 +91,29 @@ class NetlinkMonitor(command_with_output.CommandWithOutput):
                     self.get_raw_state_publisher(self.cur_iface, self.IFSTATE_UP).set('UP' in flags)
 
                     # Have a link?
-                    state_idx = tokens.index('state')
-                    state = tokens[state_idx + 1]
-                    self.get_raw_state_publisher(self.cur_iface, self.IFSTATE_LINK).set(state != 'DOWN')
+                    try:
+                        state_idx = tokens.index('state')
+                        state = tokens[state_idx + 1]
+                        self.get_raw_state_publisher(self.cur_iface, self.IFSTATE_LINK).set(state != 'DOWN')
+                    except ValueError:
+                        pass # Sometimes state is not listed.
                 
                 else:
                     # Find the address.
-                    try:
-                        addr_idx = tokens.index('inet') 
+                    if tokens[0] == 'inet':
                         if self.deleted:
                             addr_state = False
                         else:
-                            addr_state = tokens[addr_idx + 1].split('/')
+                            addr_state = tokens[1].split('/')
                         self.get_raw_state_publisher(self.cur_iface, self.IFSTATE_ADDR).set(addr_state)
-                    except ValueError:
-                        pass
+
+                    if tokens[0].startswith('link/') and len(tokens) > 1:
+                        if self.deleted:
+                            addr_state = False
+                        else:
+                            addr_state = tokens[1]
+                        self.get_raw_state_publisher(self.cur_iface, self.IFSTATE_LINK_ADDR).set(addr_state)
+
             except Exception, e:
                 print "Caught exception in NetlinkMonitor.run:", e
                 traceback.print_exc(10)
@@ -110,12 +122,13 @@ class NetlinkMonitor(command_with_output.CommandWithOutput):
 monitor = NetlinkMonitor()
 
 if __name__ == "__main__":
-    while True:
-        for i in range(0,4):
-            print monitor.get_raw_state_publisher('wlan2', i).get(),
-            print monitor.get_state_publisher('wlan2', i).get(), '  /  ',
-        print
-        time.sleep(1)
-
-
-
+    iface = 'lo'
+    try:
+        while True:
+            for i in range(0,NetlinkMonitor.IFSTATE_COUNT):
+                print monitor.get_raw_state_publisher(iface, i).get(),
+                print monitor.get_state_publisher(iface, i).get(), '  /  ',
+            print
+            time.sleep(1)
+    except KeyboardInterrupt:
+        monitor.shutdown()
