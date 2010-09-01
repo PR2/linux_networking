@@ -6,6 +6,10 @@ import thread
 import threading
 import weakref
 
+# TODO:
+# - Add support for using a reactor instead of running directly.
+# - Add an exception that allows you to unsubscribe from a callback.
+
 class DeadlockException(Exception):
     pass
 
