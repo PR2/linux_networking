@@ -95,17 +95,13 @@ class EventCallbackHandle:
         # Kill as many references as we can.
         # Clear _cb first as it is the one that gets checked in _trigger. 
         self._cb = None
-        # If not an automatic unsubscribe then set _repeating to true so
-        # that the next unsubscribe can raise a MultipleUnsubscribe
-        # exception. 
-        if _not_called_from_trigger:
-            self._repeating = True
         self._args = ()
         self._kwargs = ()
         event = self._event()
         if event is not None:
             try:
                 del event._subscribers[self]
+                event._subscription_change()
             except KeyError:
                 # Don't check once callbacks because there is a race
                 # between manual deletion and automatic deletion. If a once
@@ -113,6 +109,11 @@ class EventCallbackHandle:
                 # we will catch the second attempt.
                 if self._repeating and _not_called_from_trigger:
                     raise MultipleUnsubscribe("Repeating callback unsubscribed multiple times.")
+        # If not an automatic unsubscribe then set _repeating to true so
+        # that the next unsubscribe can raise a MultipleUnsubscribe
+        # exception. 
+        if _not_called_from_trigger:
+            self._repeating = True
         if blocking:
             # Wait until the _call_lock gets released.
             with self._call_lock("Callback tried to blocking unsubscribe itself."):
@@ -122,6 +123,7 @@ class Event:
     def __init__(self, name = "Unnamed Event"): 
         self._name = name
         self._subscribers = {}
+        self._subscription_change()
 
     def subscribe(self, cb, args, kwargs, repeating = True):
         """Subscribes to an event. 
@@ -132,6 +134,7 @@ class Event:
 
         h = EventCallbackHandle(self, cb, args, kwargs, repeating)
         self._subscribers[h] = None
+        self._subscription_change()
         return h
     
     def subscribe_once(*args, **kwargs):
@@ -156,9 +159,20 @@ class Event:
         for h in self._subscribers.keys():
             h._trigger(args, kwargs)
 
+    def _subscription_change(self):
+        """Called at the end of each subscribe/unsubscribe. Can be
+        overloaded in derived classes."""
+        pass
+
+    def unsubscribe_all(self, blocking = True):
+        """Unsubscribes all subscribers that were present at the start of
+        the call."""
+        subs = self._subscribers.keys()
+        for s in subs:
+            s._repeating = False
+            s.unsubscribe(blocking, _not_called_from_trigger = False)
+
 if __name__ == "__main__":
-    import roslib; roslib.load_manifest('multi_interface_roam')
-    import rostest
     import unittest
     import sys
         
@@ -200,6 +214,21 @@ if __name__ == "__main__":
                 (('a', '1'), { 'b' : 'c', 'g': 'h'}),
                 ])
 
+        def test_subscription_change(self):
+            """Test that the _subscription_change is called appropriately."""
+            l = []
+            class SubChangeEvent(Event):
+                def _subscription_change(self):
+                    l.append(len(self._subscribers))
+            e = SubChangeEvent()
+            h1 = e.subscribe_repeating(None)
+            h2 = e.subscribe_repeating(None)
+            h1.unsubscribe()
+            h3 = e.subscribe_repeating(None)
+            h2.unsubscribe()
+            h3.unsubscribe()
+            self.assertEqual(l, [0, 1, 2, 1, 2, 1, 0])
+
         def test_unsub_myself(self):
             """Tests that a callback can unsubscribe itself."""
             e = Event()
@@ -211,6 +240,31 @@ if __name__ == "__main__":
             self.assertEqual(l, [
                 (('t1',), {}),
                 ])
+
+        def test_multiple_unsubscribe_repeating(self):
+            """Tests exceptoin on multiple unsubscribe for repeating subscribers."""
+            e = Event()
+            h = e.subscribe_repeating(None)
+            h.unsubscribe()
+            self.assertRaises(MultipleUnsubscribe, h.unsubscribe)
+
+        def test_multiple_unsubscribe_once(self):
+            """Tests exceptoin on multiple unsubscribe for non-repeating subscribers."""
+            e = Event()
+            h = e.subscribe_repeating(None)
+            h.unsubscribe()
+            self.assertRaises(MultipleUnsubscribe, h.unsubscribe)
+
+        def test_unsubscribe_all(self):
+            """Tests basic unsubscribe_all functionality."""
+            e = Event()
+            e.subscribe_repeating(None)
+            e.subscribe_repeating(None)
+            e.subscribe_repeating(None)
+            e.subscribe_repeating(None)
+            e.subscribe_repeating(None)
+            e.unsubscribe_all()
+            self.assertEqual(len(e._subscribers), 0)
 
         def test_unsub_myself_blocking(self):
             """Tests that a blocking unsubscribe on myself raises exception."""
@@ -295,17 +349,8 @@ if __name__ == "__main__":
                 # This runs while wait_cv is waiting
                 self.l.append('main')
                 unsubed = 0
-                try:
-                    self.h1.unsubscribe(blocking = False)
-                    unsubed += 1
-                except MultipleUnsubscribe:
-                    pass
-                try:
-                    self.h2.unsubscribe(blocking = False)
-                    unsubed += 1
-                except MultipleUnsubscribe:
-                    pass
-                self.assertEqual(unsubed, 1)
+                self.h1.unsubscribe(blocking = False)
+                self.h2.unsubscribe(blocking = False)
                 self.cv.notify_all()
             
             # Let the trigger finish
@@ -323,6 +368,8 @@ if __name__ == "__main__":
             self.assertEqual(self.l, self.expected)
 
     if len(sys.argv) > 1 and sys.argv[1].startswith("--gtest_output="):
+        import roslib; roslib.load_manifest('multi_interface_roam')
+        import rostest
         rostest.unitrun('multi_interface_roam', 'event_basic', BasicTest)
         rostest.unitrun('multi_interface_roam', 'event_thread', ThreadTest)
     else:
