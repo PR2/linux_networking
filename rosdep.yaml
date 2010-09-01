@@ -9,3 +9,9 @@ libreadline-dev:
 
 udhcpc:
   ubuntu: udhcpc
+
+python-libpcap:
+  ubuntu: python-libpcap
+
+python-twisted-core:
+  ubuntu: python-twisted-core

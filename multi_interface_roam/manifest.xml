@@ -21,6 +21,8 @@
   <depend package="pr2_msgs"/>
   <depend package="wpa_supplicant"/>
   <depend package="wpa_supplicant_node"/>
+  <rosdep name="python-libpcap"/>"
+  <rosdep name="python-twisted-core"/>
   <rosdep name="udhcpc"/>
 
 </package>
