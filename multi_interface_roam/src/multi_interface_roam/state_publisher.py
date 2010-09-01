@@ -61,8 +61,6 @@ class CompositeStatePublisher(StatePublisher):
         raise Exception("set method called on CompositeStatePublisher")
 
 if __name__ == "__main__":
-    import roslib; roslib.load_manifest('multi_interface_roam')
-    import rostest
     import unittest
     import sys
     
@@ -99,6 +97,8 @@ if __name__ == "__main__":
             self.assertEqual(l, [ (None, 0), (0, 1), (1, 3), (3, 7) ])
 
     if len(sys.argv) > 1 and sys.argv[1].startswith("--gtest_output="):
+        import roslib; roslib.load_manifest('multi_interface_roam')
+        import rostest
         rostest.unitrun('multi_interface_roam', 'state_publisher_basic', BasicTest)
     else:
         unittest.main()
