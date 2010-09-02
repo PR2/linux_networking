@@ -10,7 +10,7 @@
 #include <wpa_supplicant_node/AddNetwork.h>
 #include <wpa_supplicant_node/RemoveNetwork.h>
 #include <wpa_supplicant_node/SetNetworkState.h>
-#include <wpa_supplicant_node/SetNetworkParameter.h>
+#include <wpa_supplicant_node/SetNetworkParameters.h>
 #include <wpa_supplicant_node/NetworkList.h>
 #include <wpa_supplicant_node/FrequencyList.h>
 
@@ -196,6 +196,8 @@ private:
 // Topics  
   ros::Publisher frequency_list_publisher_;
   ros::Publisher network_list_publisher_;
+  ros::Publisher association_publisher_;
+  ros::Publisher scan_publisher_;
 
 public:
   ros_interface(const ros::NodeHandle &nh, wpa_supplicant *wpa_s) :
@@ -211,10 +213,18 @@ public:
 
     network_list_publisher_ = nh_.advertise<wpa_supplicant_node::NetworkList>("network_list", 1, true);
     frequency_list_publisher_ = nh_.advertise<wpa_supplicant_node::FrequencyList>("frequency_list", 1, true);
+    association_publisher_ = nh_.advertise<wpa_supplicant_node::AssociateFeedback>("association_state", 1, true);
+    scan_publisher_ = nh_.advertise<wpa_supplicant_node::AssociateFeedback>("scan_results", 1, true);
 
     publishFrequencyList();
     publishNetworkList();
+    publishUnassociated();
+  }
 
+  void publishUnassociated()
+  {
+    wpa_supplicant_node::AssociateFeedback fbk;
+    association_publisher_.publish(fbk);
   }
 
   void ifaceIdle()
@@ -238,6 +248,7 @@ public:
         wpa_supplicant_node::ScanResult rslt;
         fillRosResp(rslt, *scan_res);
         current_scan_.setSucceeded(rslt);
+        scan_publisher_.publish(rslt);
       }
       else
       {
@@ -260,7 +271,7 @@ public:
       lockedAssociateWork();
       return;
     }
-    else if (os_memcmp(bssid, &active_association_.getGoal()->bss.bssid[0], ETH_ALEN) &&
+    else if (os_memcmp(bssid, &active_association_.getGoal()->bssid, ETH_ALEN) &&
         !is_zero_ether_addr(bssid))
     {
       ROS_ERROR("Got disassociation on unexpected BSSID: " MACSTR " (%s)", MAC2STR(bssid), s);
@@ -268,6 +279,7 @@ public:
     
     active_association_.setAborted();
     active_association_ = null_associate_goal_handle_;
+    publishUnassociated();
     lockedAssociateWork();
   }
   
@@ -281,6 +293,7 @@ public:
     // FIXME Set BSS.
     // FIXME Flag a problem if called twice.
     active_association_.publishFeedback(fbk);
+    association_publisher_.publish(fbk);
   }
 
 private:       
@@ -369,7 +382,7 @@ private:
     return true;
   }
 
-  bool setNetworkParameter(wpa_supplicant_node::SetNetworkParameter::Request &req, wpa_supplicant_node::SetNetworkParameter::Response &rsp)
+  bool setNetworkParameter(wpa_supplicant_node::SetNetworkParameters::Request &req, wpa_supplicant_node::SetNetworkParameters::Response &rsp)
   {
     ROS_INFO("setNetworkParameter");
     
@@ -403,22 +416,21 @@ private:
 
     wpa_bss *bss;
     boost::shared_ptr<const wpa_supplicant_node::AssociateGoal> goal = gh.getGoal();
-    bss = wpa_bss_get(wpa_s_, &goal->bss.bssid[0], (u8 *) goal->bss.ssid.c_str(), goal->bss.ssid.length());
+    const u8 *bssid = &goal->bssid[0];
+    std::string ssid = goal->ssid;
+
+    bss = wpa_bss_get(wpa_s_, bssid, (u8 *) ssid.c_str(), ssid.length());
     
-    wpa_ssid *ssid;
-    for (ssid = wpa_s_->conf->ssid; ssid != NULL; ssid = ssid->next)
-      if (goal->bss.ssid.length() == ssid->ssid_len && !os_memcmp(goal->bss.ssid.c_str(), ssid->ssid, ssid->ssid_len))
+    wpa_ssid *net;
+    for (net = wpa_s_->conf->ssid; net != NULL; net = net->next)
+      if (ssid.length() == net->ssid_len && !os_memcmp(ssid.c_str(), net->ssid, net->ssid_len))
           break;
 
-    if (bss && ssid && goal->bss.frequency == bss->freq)
+    if (bss && net)
     {
-      ROS_INFO("wpa_s in startActiveAssociation: %p", wpa_s_);
-      ROS_INFO("wpa_s.ros in startActiveAssociation: %p", wpa_s_->ros_api);
-      ROS_INFO("&wpa_s.ros_api in startActiveAssociation: %p", &wpa_s_->ros_api);
-      ROS_INFO("sizeof(wpa_s) in startActiveAssociation: %zi", sizeof(*wpa_s_));
       gh.setAccepted();
       active_association_ = gh;
-      wpa_supplicant_associate(wpa_s_, bss, ssid);
+      wpa_supplicant_associate(wpa_s_, bss, net);
       wpa_supplicant_node::AssociateFeedback fbk;
       fbk.associated = false;
       active_association_.publishFeedback(fbk);
@@ -427,11 +439,8 @@ private:
     {
       if (!bss)
         ROS_ERROR("startActiveAssociation could not find requested bss.");
-      if (!ssid)
+      if (!net)
         ROS_ERROR("startActiveAssociation could not find requested ssid.");
-      if (goal->bss.frequency != bss->freq)
-        ROS_ERROR("startActiveAssociation could not find requested frequency %i MHz instead of %i MHz.", 
-            goal->bss.frequency, bss->freq);
       gh.setRejected();
     }
   }

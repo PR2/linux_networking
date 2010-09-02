@@ -6,9 +6,22 @@ from twisted.internet import reactor
 import pcap
 import event
 import threading
+import socket
 
 class AlreadyClosed(Exception):
     pass
+
+
+def RawSocket(iface):
+    # We use this convoluted method so that we can have a filter
+    # that rejects all packets set.
+    p = pcap.pcapObject()
+    p.open_live(iface, 1, 0, 0)
+    p.setfilter("less 0", 1, 0)
+    p.setnonblock(True)
+    import os
+    return os.fdopen(p.fileno(),'w',0)
+    #return socket.fromfd(p.fileno(), socket.PF_PACKET, socket.SOCK_RAW)
 
 class Capture(event.Event):
     class _CaptureDescriptor:
@@ -32,10 +45,22 @@ class Capture(event.Event):
     
         def logPrefix(self):
             return ""
+
+        def _cb(self, *args):
+            self._got_pkt = True
+            self.parent.trigger(*args)
     
         def doRead(self):
+            print "doRead"
             if self.parent:
-                self.pcap.dispatch(-1, self.parent.trigger)
+                self._got_pkt = False
+                self.pcap.dispatch(-1, self._cb)
+                # If the interface goes down, then the socket will always 
+                # be readable, but never contain any data. We catch that
+                # case, and assume that it means the socket is closed.
+                if not self._got_pkt:
+                    self.parent.trigger(None, None, None)
+                    self.close()
         
         def close(self):
             reactor.removeReader(self)
@@ -68,7 +93,7 @@ class Capture(event.Event):
         if self._args is None:
             raise AlreadyClosed("Attempted to subscribe to a closed Capture object.")
         return event.Event.subscribe(self, *args, **kwargs)
-
+    
     def close(self):
         with self._sub_change_lock:
             self._args = None
