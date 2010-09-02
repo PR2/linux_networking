@@ -19,7 +19,6 @@ class Capture(event.Event):
             if filter is not None:
                 self.pcap.setfilter(filter, 1, 0)
             self.pcap.setnonblock(True)
-            print "starting"
             reactor.addReader(self)
     
         def fileno(self):
@@ -39,7 +38,6 @@ class Capture(event.Event):
                 self.pcap.dispatch(-1, self.parent.trigger)
         
         def close(self):
-            print "stopping"
             reactor.removeReader(self)
             self.pcap = None
             self.parent = None
@@ -84,8 +82,11 @@ class Capture(event.Event):
         self.close()
 
 if __name__ == "__main__":
+    import scapy.layers.l2
+    import scapy.layers.inet
+
     def print_pkt(iface, len, data, time):
-        print time, iface, len, repr(data)
+        print time, iface, len, repr(scapy.layers.l2.Ether(data).payload.payload)
 
     import gc
     def hasPcapObj():
@@ -110,26 +111,22 @@ if __name__ == "__main__":
 
     hasPcapObj()
     c1 = Capture('lo', 'icmp')
-    #c1.foo = DeathReporter('c1')
-    #c2 = Capture('eth0', 'icmp')
     h = c1.subscribe_repeating(print_pkt, 'lo')
-    #c2.subscribe_repeating(print_pkt, 'eth0')
-    #reactor.callLater(0.1, c1.close)
-    reactor.callLater(1, hasPcapObj)
-    reactor.callLater(2, h.unsubscribe)
-    reactor.callLater(3, hasPcapObj)
-    reactor.callLater(4, c1.subscribe_repeating, print_pkt, 'lo')
-    reactor.callLater(5, hasPcapObj)
-    reactor.callLater(6, c1.close)
-    reactor.callLater(7, hasPcapObj)
-    reactor.callLater(8, c1.subscribe_repeating, print_pkt, 'lo')
-    reactor.callLater(9, hasPcapObj)
-    print type(h)
-    print type(c1)
-    print c1.__class__, Capture
-    del c1
-    del h
+    #reactor.callLater(1, hasPcapObj)
+    #reactor.callLater(2, h.unsubscribe)
+    #reactor.callLater(3, hasPcapObj)
+    #reactor.callLater(4, c1.subscribe_repeating, print_pkt, 'lo')
+    #reactor.callLater(5, hasPcapObj)
+    #reactor.callLater(6, c1.close)
+    #reactor.callLater(7, hasPcapObj)
+    #reactor.callLater(8, c1.subscribe_repeating, print_pkt, 'lo')
+    #reactor.callLater(9, hasPcapObj)
+    #print type(h)
+    #print type(c1)
+    #print c1.__class__, Capture
+    #del c1
+    #del h
     reactor.run()
-    hasPcapObj()
+    #hasPcapObj()
 
     
