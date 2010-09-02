@@ -16,18 +16,26 @@ class RunCommand:
         proc = subprocess.Popen(list(args), stdout = subprocess.PIPE, stderr = subprocess.PIPE, close_fds = True)
         (self.stdout, self.stderr) = proc.communicate()
 
+class IFSTATE:
+    PLUGGED   = 0
+    UP        = 1
+    LINK      = 2
+    LINK_ADDR = 3
+    ADDR      = 4
+    COUNT     = 5
+
 class NetlinkMonitor(command_with_output.CommandWithOutput):
-    IFSTATE_PLUGGED = 0
-    IFSTATE_UP = IFSTATE_PLUGGED + 1
-    IFSTATE_LINK = IFSTATE_UP + 1
-    IFSTATE_LINK_ADDR = IFSTATE_LINK + 1
-    IFSTATE_ADDR = IFSTATE_LINK_ADDR + 1
-    IFSTATE_COUNT = IFSTATE_ADDR + 1
+    IFSTATE.PLUGGED = 0
+    IFSTATE.UP = IFSTATE.PLUGGED + 1
+    IFSTATE.LINK = IFSTATE.UP + 1
+    IFSTATE.LINK_ADDR = IFSTATE.LINK + 1
+    IFSTATE.ADDR = IFSTATE.LINK_ADDR + 1
+    IFSTATE.COUNT = IFSTATE.ADDR + 1
 
     def __init__(self):
         self.lock = threading.RLock()
-        self.raw_state_publishers = [ {} for i in range(0, self.IFSTATE_COUNT)]
-        self.state_publishers = [ {} for i in range(0, self.IFSTATE_COUNT)]
+        self.raw_state_publishers = [ {} for i in range(0, IFSTATE.COUNT)]
+        self.state_publishers = [ {} for i in range(0, IFSTATE.COUNT)]
         self.cur_iface = None
         self.deleted = None
         command_with_output.CommandWithOutput.__init__(self, ['ip', 'monitor', 'link', 'addr'], 'ip_monitor')
@@ -84,17 +92,17 @@ class NetlinkMonitor(command_with_output.CommandWithOutput):
 
                 if link_info:
                     # Plugged or not?
-                    self.get_raw_state_publisher(self.cur_iface, self.IFSTATE_PLUGGED).set(not self.deleted)
+                    self.get_raw_state_publisher(self.cur_iface, IFSTATE.PLUGGED).set(not self.deleted)
                     
                     # Up or not?
                     flags = tokens[0].strip('<>').split(',')
-                    self.get_raw_state_publisher(self.cur_iface, self.IFSTATE_UP).set('UP' in flags)
+                    self.get_raw_state_publisher(self.cur_iface, IFSTATE.UP).set('UP' in flags)
 
                     # Have a link?
                     try:
                         state_idx = tokens.index('state')
                         state = tokens[state_idx + 1]
-                        self.get_raw_state_publisher(self.cur_iface, self.IFSTATE_LINK).set(state != 'DOWN')
+                        self.get_raw_state_publisher(self.cur_iface, IFSTATE.LINK).set(state != 'DOWN')
                     except ValueError:
                         pass # Sometimes state is not listed.
                 
@@ -105,14 +113,14 @@ class NetlinkMonitor(command_with_output.CommandWithOutput):
                             addr_state = False
                         else:
                             addr_state = tokens[1].split('/')
-                        self.get_raw_state_publisher(self.cur_iface, self.IFSTATE_ADDR).set(addr_state)
+                        self.get_raw_state_publisher(self.cur_iface, IFSTATE.ADDR).set(addr_state)
 
                     if tokens[0].startswith('link/') and len(tokens) > 1:
                         if self.deleted:
                             addr_state = False
                         else:
                             addr_state = tokens[1]
-                        self.get_raw_state_publisher(self.cur_iface, self.IFSTATE_LINK_ADDR).set(addr_state)
+                        self.get_raw_state_publisher(self.cur_iface, IFSTATE.LINK_ADDR).set(addr_state)
 
             except Exception, e:
                 print "Caught exception in NetlinkMonitor.run:", e
@@ -122,10 +130,10 @@ class NetlinkMonitor(command_with_output.CommandWithOutput):
 monitor = NetlinkMonitor()
 
 if __name__ == "__main__":
-    iface = 'lo'
+    iface = 'wlan2'
     try:
         while True:
-            for i in range(0,NetlinkMonitor.IFSTATE_COUNT):
+            for i in range(0,IFSTATE.COUNT):
                 print monitor.get_raw_state_publisher(iface, i).get(),
                 print monitor.get_state_publisher(iface, i).get(), '  /  ',
             print
