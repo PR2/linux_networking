@@ -3,7 +3,7 @@ import traceback
 import threading
 from contextlib import contextmanager
 
-import smach
+import asmach as smach
 
 __all__ = ['Container']
 

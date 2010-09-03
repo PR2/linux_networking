@@ -2,10 +2,12 @@
 import threading
 import traceback
 
-import smach
+import asmach as smach
 
 __all__ = ['State','CBState']
-
+            
+import sys
+    
 class State(object):
     """Base class for SMACH states.
 
@@ -42,16 +44,12 @@ class State(object):
         # Declare preempt flag
         self._preempt_requested = False
 
-    ### Meat
-    def execute(self, ud):
-        """Called when executing a state.
-        In the base class this raises a NotImplementedError.
-
-        @type ud: L{UserData} structure
-        @param ud: Userdata for the scope in which this state is executing
-        """
-        raise NotImplementedError()
+    ### Asynchronous
     
+    def execute_async(self, continuation, resume, ud):
+        raise NotImplementedError()
+        yield
+
     ### SMACH Interface API
     def register_outcomes(self,new_outcomes):
         """Add outcomes to the outcome set."""

@@ -1,10 +1,10 @@
 
 import roslib; roslib.load_manifest('smach')
-import smach
+import asmach as smach
 
 import threading
 
-import smach
+import asmach as smach
 
 __all__ = ['is_shutdown','set_shutdown_cb',\
         'cb_interface','has_smach_interface','CBInterface']
@@ -41,7 +41,7 @@ class CBInterface(object):
     If a callback adds a potential outcome to a state, suppose 'critical_failure',
     then one could write this when defining the callback:
 
-    >>> import smach
+    >>> import asmach as smach
     >>> @smach.cb_interface(outcomes=['critical_failure'])
     >>> def my_cb(x,y,z):
     >>>     # User code
@@ -51,7 +51,7 @@ class CBInterface(object):
     wants to take that data and put some of all of it into userdata, this
     interface must be declared. In this case, the user could write:
 
-    >>> import smach
+    >>> import asmach as smach
     >>> @smach.cb_interface(output_keys=['processed_res'])
     >>> def my_cb(ud, data):
     >>>     ud.processed_res = data

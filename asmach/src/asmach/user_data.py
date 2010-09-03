@@ -2,7 +2,7 @@
 import threading
 import copy
 
-import smach
+import asmach as smach
 
 __all__ = ['UserData','Remapper']
 

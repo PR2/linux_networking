@@ -3,7 +3,8 @@ import threading
 import traceback
 from contextlib import contextmanager
 
-import smach
+import asmach as smach
+from asmach import async
 
 __all__ = ['StateMachine']
 
@@ -194,6 +195,7 @@ class StateMachine(smach.container.Container):
             self._current_transitions = None
             self._current_outcome = None
 
+    @async.function
     def _update_once(self):
         """Method that updates the state machine once.
         This checks if the current state is ready to transition, if so, it
@@ -201,6 +203,7 @@ class StateMachine(smach.container.Container):
         label from the current state's transition dictionary, and then transitions
         to the next state.
         """
+        yield
         outcome = None
         transition_target = None
         last_state_label = self._current_label
@@ -232,7 +235,7 @@ class StateMachine(smach.container.Container):
         # Execute the state
         try:
             self._state_transitioning_lock.release()
-            outcome = self._current_state.execute(
+            outcome = yield self._current_state.execute_async(
                     smach.Remapper(
                         self.userdata,
                         self._current_state.get_registered_input_keys(),
@@ -293,14 +296,15 @@ class StateMachine(smach.container.Container):
                 # Call termination callbacks
                 self.call_termination_cbs([last_state_label],transition_target)
 
-                return transition_target
+                async.returnValue(transition_target)
             else:
                 raise smach.InvalidTransitionError("Outcome '%s' of state '%s' with transition target '%s' is neither a registered state nor a registered container outcome." %
                         (str(outcome), str(self._current_label), str(transition_target)))
-        return None
+        async.returnValue(None)
 
     ### State Interface
-    def execute(self, parent_ud = smach.UserData()):
+    @async.function
+    def execute_async(self, parent_ud = smach.UserData()):
         """Run the state machine on entry to this state.
         This will set the "closed" flag and spin up the execute thread. Once
         this flag has been set, it will prevent more states from being added to
@@ -314,7 +318,7 @@ class StateMachine(smach.container.Container):
                 self.check_consistency()
             except (smach.InvalidStateError, smach.InvalidTransitionError):
                 smach.logerr("Container consistency check failed.")
-                return None
+                async.returnValue(None)
 
             # Set running flag
             self._is_running = True
@@ -343,7 +347,7 @@ class StateMachine(smach.container.Container):
             # Step through state machine
             while container_outcome is None and self._is_running and not smach.is_shutdown():
                 # Update the state machine
-                container_outcome = self._update_once()
+                container_outcome = yield self._update_once()
 
             # Copy output keys
             self._copy_output_keys(self.userdata, parent_ud)
@@ -351,7 +355,7 @@ class StateMachine(smach.container.Container):
             # We're no longer running
             self._is_running = False
 
-        return container_outcome
+        async.returnValue(container_outcome)
 
     ## Preemption management
     def request_preempt(self):
@@ -497,5 +501,5 @@ class StateMachine(smach.container.Container):
 
     ### Introspection methods
     def is_running(self):
-        """Returns true if the state machine is running."""
+        """async.returnValues true if the state machine is running."""
         return self._is_running

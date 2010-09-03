@@ -27,31 +27,32 @@
 # Define default logging macros
 
 ### Utilities
-from smach.logging import\
+from asmach.log import\
         set_loggers,\
         loginfo,\
         logwarn,\
         logerr,\
         logdebug
 
-from smach.exceptions import\
+from asmach.exceptions import\
         InvalidTransitionError,\
         InvalidStateError,\
         InvalidConstructionError,\
         InvalidUserCodeError
 
 ### Core classes
-from smach.state import State, CBState
-from smach.user_data import UserData, Remapper
-from smach.container import Container
+import asmach.async as async
+from asmach.state import State, CBState
+from asmach.user_data import UserData, Remapper
+from asmach.container import Container
 
-from smach.util import\
+from asmach.util import\
         is_shutdown, set_shutdown_check,\
         has_smach_interface, cb_interface, CBInterface
 
 ### Containers
-from smach.state_machine import StateMachine
-from smach.sequence import Sequence
-from smach.concurrence import Concurrence
-from smach.iterator import Iterator
+from asmach.state_machine import StateMachine
+from asmach.sequence import Sequence
+from asmach.concurrence import Concurrence
+from asmach.iterator import Iterator
 

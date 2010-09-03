@@ -4,7 +4,7 @@ import traceback
 import copy
 from contextlib import contextmanager
 
-import smach
+import asmach as smach
 
 __all__ = ['Concurrence']
 

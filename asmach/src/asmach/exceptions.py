@@ -1,5 +1,5 @@
 
-import smach
+import asmach as smach
 
 __all__ = ['InvalidTransitionError',
         'InvalidStateError',
