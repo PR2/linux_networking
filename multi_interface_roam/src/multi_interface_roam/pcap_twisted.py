@@ -11,7 +11,6 @@ import socket
 class AlreadyClosed(Exception):
     pass
 
-
 def RawSocket(iface):
     # We use this convoluted method so that we can have a filter
     # that rejects all packets set.
@@ -20,8 +19,10 @@ def RawSocket(iface):
     p.setfilter("less 0", 1, 0)
     p.setnonblock(True)
     import os
-    return os.fdopen(p.fileno(),'w',0)
-    #return socket.fromfd(p.fileno(), socket.PF_PACKET, socket.SOCK_RAW)
+    #return os.fdopen(p.fileno(),'w',0)
+    s = socket.fromfd(p.fileno(), socket.PF_PACKET, socket.SOCK_RAW) 
+    p.open_dead(0, 0)
+    return s
 
 class Capture(event.Event):
     class _CaptureDescriptor:
@@ -63,7 +64,9 @@ class Capture(event.Event):
                     self.close()
         
         def close(self):
+            print "Closing descriptor."
             reactor.removeReader(self)
+            self.pcap.open_dead(0, 0)
             self.pcap = None
             self.parent = None
 
@@ -79,15 +82,17 @@ class Capture(event.Event):
             has_descr = self._descr is not None
             has_subs = len(self._subscribers) != 0
             if has_descr and not has_subs:
+                print "No more subscribers!"
                 self._descr.close()
                 self._descr = None
             elif not has_descr and has_subs:
+                print "Subscribers added!"
                 if self._args != None: # We are not closed.
                     self._descr = Capture._CaptureDescriptor(self, *self._args, **self._kwargs)
                 else:
                     # There is a race that lets a subscribe slip through
                     # just after close does its unsubscribe_all. This case patches it.
-                    self.unsubscribe_all()
+                    self.unsubscribe_all(blocking = False)
 
     def subscribe(self, *args, **kwargs):
         if self._args is None:
@@ -98,7 +103,7 @@ class Capture(event.Event):
         with self._sub_change_lock:
             self._args = None
             self._kwargs = None
-        self.unsubscribe_all()
+        self.unsubscribe_all(blocking = False)
 
     def __enter__(self):
         pass
