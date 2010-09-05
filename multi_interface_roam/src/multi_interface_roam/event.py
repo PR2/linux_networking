@@ -3,7 +3,6 @@
 from __future__ import with_statement
 
 import thread
-import threading
 import weakref
 
 # TODO:
