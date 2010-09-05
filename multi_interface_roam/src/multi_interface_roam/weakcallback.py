@@ -1,4 +1,4 @@
-# Grabbed this handy code from here:
+# Grabbed this handy code from here: 
 # http://efreedom.com/Question/1-1673483/Store-Callback-Methods
 
 import weakref
