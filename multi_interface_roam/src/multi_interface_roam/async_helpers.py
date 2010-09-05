@@ -192,21 +192,25 @@ if __name__ == "__main__":
             self.assertRaises(IndexError, es._queue.pop)
 
     exitval = []
-    @wrap_function
-    def catch_systemexit(f, *args, **kwargs):
+    def run_test():
         try:
-            return f(*args, **kwargs)
+            if len(sys.argv) > 1 and sys.argv[1].startswith("--gtest_output="):
+                    unittest.main()
+            else:
+                import roslib; roslib.load_manifest('multi_interface_roam')
+                import rostest
+                rostest.unitrun('multi_interface_roam', 'select', SelectTest)
+                rostest.unitrun('multi_interface_roam', 'switch', SwitchTest)
+            exitval.append(0)
         except SystemExit, v:
             exitval.append(v.code)
+        except:
+            import traceback
+            traceback.print_exc()
+        finally:
+            reactor.stop()
 
-    if len(sys.argv) > 1 and sys.argv[1].startswith("--gtest_output="):
-        import roslib; roslib.load_manifest('multi_interface_roam')
-        import rostest
-        reactor.callWhenRunning(rostest.unitrun, 'multi_interface_roam', 'select', SelectTest)
-        reactor.callWhenRunning(rostest.unitrun, 'multi_interface_roam', 'switch', SwitchTest)
-    else:
-        reactor.callWhenRunning(catch_systemexit(unittest.main))
-    reactor.callWhenRunning(reactor.stop)
+    reactor.callWhenRunning(run_test)
     reactor.run()
 
     sys.exit(exitval[0])
