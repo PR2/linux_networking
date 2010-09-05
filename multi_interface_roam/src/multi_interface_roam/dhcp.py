@@ -3,7 +3,7 @@
 import roslib; roslib.load_manifest('multi_interface_roam')
 
 import socket
-from scapy.all import BOOTP, DHCP, IP, UDP, Ether, mac2str
+from scapy.all import BOOTP, DHCP, IP, UDP, Ether, mac2str, attach_filter
 import IN
 from twisted.internet.protocol import DatagramProtocol
 from twisted.internet import reactor, udp
@@ -49,6 +49,17 @@ from async_helpers import async_sleep, event_queue
 #class MyProtocol(DatagramProtocol):
 #    def datagramReceived(self, datagram, address):
 #        print >> sys.stderr, "Got data!"
+
+def dhcp_client_socket(iface):
+    s = socket.socket(socket.PF_PACKET, socket.SOCK_RAW, 768)
+    s.bind((iface, 0x03))
+    attach_filter(s, "udp and port 68")
+    #s.setblocking(0)
+    return s
+
+s = dhcp_client_socket('eth0')
+while True:
+    print repr(Ether(s.recv(1500)))
 
 def send_discover2(s, hw):
     hwbytes = mac2str(hw)
