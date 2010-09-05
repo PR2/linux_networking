@@ -1,5 +1,7 @@
-from twisted.internet.defer import Deferred, DeferredQueue
+#! /usr/bin/env python
+from twisted.internet.defer import Deferred, DeferredQueue, inlineCallbacks, returnValue
 from twisted.internet import reactor
+from collections import deque
 
 def async_sleep(t):
     d = Deferred()
@@ -14,3 +16,197 @@ def event_queue(event):
     q.unsubscribe = h.unsubscribe
     return q
 
+class EventStream:
+    """Event stream class to be used with select and switch."""
+    def __init__(self):
+        self._queue = deque()
+        self._invoke_listener = None
+
+    def put(*args, **kwargs):
+        self = args[0]
+        self._queue.append((args[1:], kwargs))
+        if self._invoke_listener:
+            self._trigger()
+
+    def get(self):
+        return self._queue.popleft()
+    
+    def _trigger(self):
+        self._invoke_listener.callback(None)
+        self._invoke_listener = None
+
+    def listen(self):
+        if self._invoke_listener:
+            raise Exception("Event stream in use from multiple places simultaneously.")
+        d = self._invoke_listener = Deferred()
+        if self._queue:
+            self._trigger()
+        return d
+
+    def stop_listen(self):
+        assert self._invoke_listener or self._queue
+        self._invoke_listener = None
+
+class EventStreamFromDeferred(EventStream):
+    def __init__(self, d = None):
+        EventStream.__init__(self)
+        if d is None:
+            d = Deferred()
+        self.deferred = d
+        d.addCallback(self.put)
+
+class Timeout(EventStream):
+    def __init__(self, timeout):
+        EventStream.__init__(self)
+        reactor.callLater(timeout, self.put)
+
+@inlineCallbacks
+def select(*events):
+    ready_list = []
+    done = Deferred()
+    def cb(_, i):
+        ready_list.append(i)
+        if not done.called:
+            done.callback(None)
+    for i in range(len(events)):
+        events[i].listen().addCallback(cb, i)
+    yield done
+    for e in events:
+        e.stop_listen()
+    returnValue(ready_list)
+
+@inlineCallbacks
+def switch(cases, multiple = False):
+    events, actions = zip(*cases.iteritems())
+
+    ready_list = yield select(*events)
+
+    for i in ready_list:
+        args, kwargs = events[i].get()
+        actions[i](*args, **kwargs)
+        if not multiple:
+            break
+
+def wrap_function(f):
+    def run_f(g):
+        def run_g(*args, **kwargs):
+            return f(g, *args, **kwargs)
+        return run_g
+    return run_f
+
+@wrap_function
+def async_test(f, *args, **kwargs):
+    "Starts an asynchronous test, waits for it to complete, and returns its result."
+    result = []
+    def cb(value, good):
+        result.append(good)
+        result.append(value)
+    inlineCallbacks(f)(*args, **kwargs).addCallbacks(callback = cb, callbackArgs = [True],
+                                    errback  = cb, errbackArgs  = [False])
+    while not result:
+        reactor.iterate(0.02)
+    if result[0]:
+        # Uncomment the following line to check that all the tests
+        # really are being run to completion.
+        #raise(Exception("Success"))
+        return result[1]
+    else:
+        result[1].raiseException()
+
+if __name__ == "__main__":
+    import unittest
+    import threading
+    import sys
+    from twisted.internet.defer import setDebugging
+    setDebugging(True)
+
+    class SelectTest(unittest.TestCase):
+        @async_test
+        def test_select_param1(self):
+            "Tests that the first parameter can get returned."
+            self.assertEqual((yield (select(Timeout(.01), Timeout(100)))), [0])
+        
+        @async_test
+        def test_select_param2(self):
+            "Tests that the second parameter can get returned."
+            self.assertEqual((yield (select(Timeout(100), Timeout(.01)))), [1])
+        
+        @async_test
+        def test_select_both(self):
+            "Tests that the both parameters can get returned."
+            es1 = EventStream()
+            es2 = EventStream()
+            es1.put(None)
+            es2.put(None)
+            self.assertEqual((yield select(es1, es2)), [0, 1])
+    
+    class SwitchTest(unittest.TestCase):
+        @async_test
+        def test_switch_param(self):
+            "Tests switch on single outcome."
+            yield switch({
+                Timeout(.01): lambda : None,
+                Timeout(100): lambda : self.fail('Wrong switch'),
+                })
+
+        @async_test
+        def test_switch_both(self):
+            "Tests switch on simultaneous, non-multiple."
+            es1 = EventStream()
+            es2 = EventStream()
+            es1.put()
+            es2.put()
+            hits = []
+            yield switch({
+                es1: lambda : hits.append(None),
+                es2: lambda : hits.append(None),
+                    })
+            self.assertEqual(len(hits), 1)
+        
+        @async_test
+        def test_switch_both(self):
+            "Tests switch on simultaneous, multiple."
+            es1 = EventStreamFromDeferred()
+            es2 = EventStreamFromDeferred()
+            es1.deferred.callback(None)
+            es2.deferred.callback(None)
+            hits = []
+            yield switch({
+                es1: lambda _: hits.append(None),
+                es2: lambda _: hits.append(None),
+                    }, multiple = True)
+            self.assertEqual(len(hits), 2)
+
+        @async_test
+        def test_switch_parameters(self):
+            "Tests that switch passes parameters correctly."
+            es = EventStream()
+            es.put(3)
+            es.put(4)
+            yield switch({
+                es: lambda v: self.assertEqual(v, 3),
+                    }, multiple = True)
+            yield switch({
+                es: lambda v: self.assertEqual(v, 4),
+                    }, multiple = True)
+            self.assertRaises(IndexError, es._queue.pop)
+
+    exitval = []
+    @wrap_function
+    def catch_systemexit(f, *args, **kwargs):
+        try:
+            return f(*args, **kwargs)
+        except SystemExit, v:
+            exitval.append(v.code)
+
+    if len(sys.argv) > 1 and sys.argv[1].startswith("--gtest_output="):
+        import roslib; roslib.load_manifest('multi_interface_roam')
+        import rostest
+        reactor.callWhenRunning(rostest.unitrun, 'multi_interface_roam', 'select', SelectTest)
+        reactor.callWhenRunning(rostest.unitrun, 'multi_interface_roam', 'switch', SwitchTest)
+    else:
+        reactor.callWhenRunning(catch_systemexit(unittest.main))
+    reactor.callWhenRunning(reactor.stop)
+    reactor.run()
+
+    sys.exit(exitval[0])
