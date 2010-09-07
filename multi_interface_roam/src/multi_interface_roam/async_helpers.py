@@ -44,7 +44,7 @@ class EventStream:
         d = self._invoke_listener = Deferred()
         if self._queue:
             self._trigger()
-        return d
+        return d # Using d because self._trigger() may change self._invoke_listener
 
     def stop_listen(self):
         assert self._invoke_listener or self._queue
@@ -61,7 +61,16 @@ class EventStreamFromDeferred(EventStream):
 class Timeout(EventStream):
     def __init__(self, timeout):
         EventStream.__init__(self)
-        reactor.callLater(timeout, self.put)
+        h = reactor.callLater(timeout, self.put)
+        def cancel():
+            if not h.called:
+                h.cancel()
+        self.put.set_deleted_cb(cancel)
+
+class Now(EventStream):
+    def __init__(self):
+        EventStream.__init__(self)
+        self.put()
 
 @inlineCallbacks
 def select(*events):
@@ -70,17 +79,21 @@ def select(*events):
     one that is ready."""
     ready_list = []
     done = Deferred()
-    def cb(_, i):
+    def _select_cb(_, i):
         ready_list.append(i)
         if not done.called:
             done.callback(None)
     for i in range(len(events)):
-        events[i].listen().addCallback(cb, i)
+        events[i].listen().addCallback(_select_cb, i)
+    print "Try..................."
     try:
         yield done
     finally:
+        print "Finally..................."
         for e in events:
             e.stop_listen()
+        del events # Needed to avoid creating a cycle when events gets put
+                   # into the traceback associated with returnValue.
     returnValue(ready_list)
 
 @inlineCallbacks
@@ -125,6 +138,7 @@ if __name__ == "__main__":
     import unittest
     import threading
     import sys
+    import gc
     from twisted.internet.defer import setDebugging
     setDebugging(True)
 
@@ -137,12 +151,72 @@ if __name__ == "__main__":
             esr = weakref.ref(es)
             putter = es.put
             l = []
-            putter.set_deleted_cb(lambda : (sys.stdout.write("hello\n"), l.append('deleted')))
+            putter.set_deleted_cb(lambda : l.append('deleted'))
             self.assertEqual(l, [])
             self.assertEqual(esr(), es)
             del es
             self.assertEqual(l, ['deleted'])
             self.assertEqual(esr(), None)
+
+        @async_test
+        def test_timeout_memory_frees_correctly(self):
+            """Had a lot of subtle bugs getting select to free up properly.
+            This test case is what pointed me at them."""
+            before = 0
+            after = 0
+
+            # First couple of times through seems to create some new data.
+            yield select(Timeout(0.001))
+            yield select(Timeout(0.001))
+            
+            before = len(gc.get_objects())
+            # The yielding statement seems necessary, some stuff only gets
+            # cleaned up when going through the reactor main loop.
+            yield select(Timeout(0.001))
+            after = len(gc.get_objects())
+            
+            self.assertEqual(before, after)
+            
+        @async_test
+        def test_timeout_autocancel(self):
+            self.assertEqual(len(reactor.getDelayedCalls()), 0)
+            yield select(Timeout(0.3), Timeout(0.001))
+            self.assertEqual(len(reactor.getDelayedCalls()), 0)
+            
+
+    def follow_back(a, n):
+        """Handy function for seeing why an object is still live by walking
+        back through its referrers."""
+        import inspect
+        def print_elem(e):
+            print repr(e)[0:200]
+            try:
+                print e.f_lineno
+                #print e.f_locals
+                #print dir(e)
+            except:
+                pass
+        print
+        print "Follow back:"
+        print_elem(a)
+        for i in range(n):
+            r = gc.get_referrers(a)
+            r.remove(inspect.currentframe())
+            print
+            print len(r)
+            for e in r:
+                print_elem(e)
+            a = r[0]
+
+    def compare_before_after(before, after):
+        """Handy function to compare live objects before and after some
+        operation, to debug why memory is leaking."""
+        beforeids = set(id(e) for e in before)
+        afterids = set(id(e) for e in after)
+        delta = afterids - beforeids - set([id(before)])
+        for e in after:
+            if id(e) in delta:
+                print e
 
     class SelectTest(unittest.TestCase):
         @async_test
@@ -163,7 +237,7 @@ if __name__ == "__main__":
             es1.put(None)
             es2.put(None)
             self.assertEqual((yield select(es1, es2)), [0, 1])
-    
+
     class SwitchTest(unittest.TestCase):
         @async_test
         def test_switch_param(self):

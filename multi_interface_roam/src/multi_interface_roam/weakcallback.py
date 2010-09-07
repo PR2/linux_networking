@@ -42,6 +42,10 @@ class WeakCallbackCb(WeakCallback):
     def object_deleted(self, wref):
         if self._deleted_cb:
             self._deleted_cb(*self._args, **self._kwargs)
+            # Typically, the _deleted_cb will have a reference to the
+            # object that has us as a callback, so we need to break that
+            # cycle after calling the callback.
+            self.set_deleted_cb()
 
     def set_deleted_cb(self, cb = None, *args, **kwargs):
         self._deleted_cb = cb
