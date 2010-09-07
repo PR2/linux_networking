@@ -85,11 +85,9 @@ def select(*events):
             done.callback(None)
     for i in range(len(events)):
         events[i].listen().addCallback(_select_cb, i)
-    print "Try..................."
     try:
         yield done
     finally:
-        print "Finally..................."
         for e in events:
             e.stop_listen()
         del events # Needed to avoid creating a cycle when events gets put
@@ -104,7 +102,9 @@ def switch(cases, multiple = False):
 
     for i in ready_list:
         args, kwargs = events[i].get()
-        actions[i](*args, **kwargs)
+        if actions[i]:
+            print actions[i]
+            actions[i](*args, **kwargs)
         if not multiple:
             break
 
@@ -245,6 +245,13 @@ if __name__ == "__main__":
             yield switch({
                 Timeout(.01): lambda : None,
                 Timeout(100): lambda : self.fail('Wrong switch'),
+                })
+
+        @async_test
+        def test_switch_empty_action(self):
+            "Tests that a None action doesn't cause an exception."
+            yield switch({
+                Timeout(.01): None,
                 })
 
         @async_test
