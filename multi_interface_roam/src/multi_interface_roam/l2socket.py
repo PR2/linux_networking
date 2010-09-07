@@ -29,16 +29,13 @@ class L2Port:
         data = self._socket.recv(self._max_size)
         self._protocol.dataReceived(data)
 
-    def write(self, data):
-        self._socket.write(data)
-
     def startListening(self):    
         self._reactor.addReader(self)
 
     def stopListening(self):
         self._reactor.delReader(self)
 
-    def write(self, data):
+    def send(self, data):
         self._socket.send(data)
     
     def connectionLost(self, reason=None):
@@ -74,14 +71,14 @@ if __name__ == "__main__":
 
             proto = TstProto()
             port = reactor.listenWith(L2Port, proto, iface = 'lo', filter='icmp')
-            port.write(packet)
+            port.send(packet)
             yield deferred
     
         @async_test
         def test_as_event_stream(self):
             es = async_helpers.ReadDescrEventStream(L2Port, iface = 'lo', filter='icmp')
             pkt = tst_icmp_pkt()
-            es.port.write(pkt)
+            es.port.send(pkt)
             while True:
                 yield async_helpers.select(es)
                 inpkt = es.recv()

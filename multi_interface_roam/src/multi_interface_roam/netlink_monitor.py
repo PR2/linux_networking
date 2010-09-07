@@ -127,7 +127,7 @@ class NetlinkMonitor(command_with_output.CommandWithOutput):
                 traceback.print_exc(10)
                 print
 
-monitor = NetlinkMonitor()
+monitor = netlink_monitor = NetlinkMonitor()
 
 if __name__ == "__main__":
     from twisted.internet import reactor

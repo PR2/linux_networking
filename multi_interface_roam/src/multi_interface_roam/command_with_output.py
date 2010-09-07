@@ -27,7 +27,8 @@ class CommandWithOutput(protocol.ProcessProtocol):
         self.outline = ""
         self.errline = ""
         self.shutting_down = False
-        self.start_proc()
+        reactor.addSystemEventTrigger('during', 'shutdown', self.shutdown)
+        reactor.callWhenRunning(self.start_proc)
                             
     def errReceived(self, data):
         self.errline = self.data_received(self.errline, data)
