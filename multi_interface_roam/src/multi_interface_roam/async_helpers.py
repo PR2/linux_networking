@@ -143,6 +143,7 @@ def unittest_with_reactor(run_ros_tests):
                 import rostest
                 run_ros_tests()
             else:
+                import unittest
                 unittest.main()
             exitval.append(0)
         except SystemExit, v:
