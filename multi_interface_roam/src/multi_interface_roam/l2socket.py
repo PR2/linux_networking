@@ -73,7 +73,7 @@ if __name__ == "__main__":
             port = reactor.listenWith(L2Port, proto, iface = 'lo', filter='icmp')
             port.send(packet)
             yield deferred
-    
+             
         @async_test
         def test_as_event_stream(self):
             es = async_helpers.ReadDescrEventStream(L2Port, iface = 'lo', filter='icmp')
