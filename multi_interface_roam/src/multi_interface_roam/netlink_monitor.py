@@ -67,7 +67,7 @@ class NetlinkMonitor(command_with_output.CommandWithOutput):
         if not interface in pubs:
             pubs[interface] = state_publisher.StatePublisher(False)
         return pubs[interface]
-    
+     
     def got_line(self, line):
         with self.lock:
             try:
