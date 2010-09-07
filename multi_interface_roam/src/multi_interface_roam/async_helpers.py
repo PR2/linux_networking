@@ -4,6 +4,7 @@ from twisted.internet import reactor
 from collections import deque
 from weakcallback import WeakCallbackCb
 import weakref
+import sys
 
 def async_sleep(t):
     d = Deferred()
