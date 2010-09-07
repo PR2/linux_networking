@@ -42,7 +42,7 @@ class Init(DhcpState):
     def __init__(self):
         DhcpState.__init__(self, outcomes=['sent'])
 
-    @inlineCallbacks
+    @inlineCallbacks 
     def execute_async(self, ud):
         yield async_helpers.async_sleep(1)
         ud.dhcp.start_socket()
