@@ -133,6 +133,29 @@ def async_test(f, *args, **kwargs):
     else:
         result[1].raiseException()
 
+def unittest_with_reactor(run_ros_tests):
+    exitval = []
+    def run_test():
+        try:
+            if len(sys.argv) > 1 and sys.argv[1].startswith("--gtest_output="):
+                import roslib; roslib.load_manifest('multi_interface_roam')
+                import rostest
+                run_ros_tests()
+            else:
+                unittest.main()
+            exitval.append(0)
+        except SystemExit, v:
+            exitval.append(v.code)
+        except:
+            import traceback
+            traceback.print_exc()
+        finally:
+            reactor.stop()
+
+    reactor.callWhenRunning(run_test)
+    reactor.run()
+    sys.exit(exitval[0])
+
 if __name__ == "__main__":
     import unittest
     import threading
@@ -295,27 +318,9 @@ if __name__ == "__main__":
                     }, multiple = True)
             self.assertRaises(IndexError, es._queue.pop)
 
-    exitval = []
-    def run_test():
-        try:
-            if len(sys.argv) > 1 and sys.argv[1].startswith("--gtest_output="):
-                import roslib; roslib.load_manifest('multi_interface_roam')
-                import rostest
-                rostest.unitrun('multi_interface_roam', 'eventstream', EventStreamTest)
-                rostest.unitrun('multi_interface_roam', 'select', SelectTest)
-                rostest.unitrun('multi_interface_roam', 'switch', SwitchTest)
-            else:
-                unittest.main()
-            exitval.append(0)
-        except SystemExit, v:
-            exitval.append(v.code)
-        except:
-            import traceback
-            traceback.print_exc()
-        finally:
-            reactor.stop()
+    def run_ros_tests():
+        rostest.unitrun('multi_interface_roam', 'eventstream', EventStreamTest)
+        rostest.unitrun('multi_interface_roam', 'select', SelectTest)
+        rostest.unitrun('multi_interface_roam', 'switch', SwitchTest)
 
-    reactor.callWhenRunning(run_test)
-    reactor.run()
-
-    sys.exit(exitval[0])
+    unittest_with_reactor(run_ros_tests)
