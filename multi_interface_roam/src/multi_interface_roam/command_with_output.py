@@ -5,17 +5,26 @@ import logging
 import logging.handlers
 import os
 from logging_config import *
+import subprocess
 import fcntl
 import time
 import traceback
 import signal
 import select
-from twisted.internet import protocol
 
-class CommandWithOutput(protocol.ProcessProtocol):
+class CommandWithOutput(threading.Thread):
     def __init__(self, args, name):
         self.restart_delay = 0.2
         threading.Thread.__init__(self, name = name)
+        #logname = os.path.join(logdir, '%s.log'%name)
+        #try:
+        #    os.makedirs(logdir)
+        #except OSError, e:
+        #    if e.errno != errno.EEXIST:
+        #        raise
+        #print "Creating log file:", logname
+        #self.log = open(os.path.join(logname), 'a')
+        #self.log.write("\n\n\nStarting new session...\n")
         self.logger = logging.getLogger(name)
         self.console_logger = logging.getLogger('console.%s'%name)
         logger_handler = logging.handlers.TimedRotatingFileHandler(os.path.join(logdir,'%s.log'%name), when='midnight', backupCount=logfilecount)

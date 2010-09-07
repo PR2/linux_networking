@@ -103,7 +103,6 @@ def switch(cases, multiple = False):
     for i in ready_list:
         args, kwargs = events[i].get()
         if actions[i]:
-            print actions[i]
             actions[i](*args, **kwargs)
         if not multiple:
             break
