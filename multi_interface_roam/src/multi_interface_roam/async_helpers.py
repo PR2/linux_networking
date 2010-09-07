@@ -1,10 +1,13 @@
 #! /usr/bin/env python 
 from twisted.internet.defer import Deferred, DeferredQueue, inlineCallbacks, returnValue
 from twisted.internet import reactor
+from twisted.internet.protocol import Protocol
 from collections import deque
 from weakcallback import WeakCallbackCb
 import weakref
 import sys
+
+# FIXME Add test for ReadDescrEventStream
 
 def async_sleep(t):
     d = Deferred()
@@ -73,6 +76,17 @@ class Now(EventStream):
         EventStream.__init__(self)
         self.put()
 
+class ReadDescrEventStream(Protocol, EventStream):
+    def __init__(self, portType, *args, **kwargs):
+        EventStream.__init__(self)
+        self.port = reactor.listenWith(portType, self, *args, **kwargs)
+
+    def dataReceived(self, data):
+        self._put(data)
+
+    def recv(self):
+        return self.get()[0][0]
+
 @inlineCallbacks
 def select(*events):
     """Listens to the provided EventStreams, and returns a set of integers
@@ -132,6 +146,7 @@ def async_test(f, *args, **kwargs):
         #raise(Exception("Success"))
         return result[1]
     else:
+        result[1].printTraceback()
         result[1].raiseException()
 
 def unittest_with_reactor(run_ros_tests):
