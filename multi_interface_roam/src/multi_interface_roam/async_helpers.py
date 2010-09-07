@@ -237,7 +237,7 @@ if __name__ == "__main__":
             es1.put(None)
             es2.put(None)
             self.assertEqual((yield select(es1, es2)), [0, 1])
-
+     
     class SwitchTest(unittest.TestCase):
         @async_test
         def test_switch_param(self):
