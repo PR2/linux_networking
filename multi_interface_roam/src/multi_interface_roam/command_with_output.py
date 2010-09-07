@@ -9,7 +9,7 @@ import time
 import traceback
 import signal
 import select
-from twisted.internet import protocol
+from twisted.internet import protocol, reactor
 
 class CommandWithOutput(protocol.ProcessProtocol):
     def __init__(self, args, name):
@@ -30,10 +30,10 @@ class CommandWithOutput(protocol.ProcessProtocol):
         self.start_proc()
                             
     def errReceived(self, data):
-        self.errline = self.dataReceived(self.errline, data)
+        self.errline = self.data_received(self.errline, data)
 
     def outReceived(self, data):
-        self.outline = self.dataReceived(self.outline, data)
+        self.outline = self.data_received(self.outline, data)
 
     def data_received(self, curline, data):
         curline += data
@@ -41,7 +41,7 @@ class CommandWithOutput(protocol.ProcessProtocol):
             splitpos = curline.find('\n')
             if splitpos == -1:
                 break
-            self.got_line(curline[splitpos])
+            self.got_line(curline[:splitpos])
             curline = curline[splitpos+1:]
         return curline
 
@@ -57,7 +57,7 @@ class CommandWithOutput(protocol.ProcessProtocol):
     
     def start_proc(self):
         try:
-            self.proc = reactor.spawnProcess(self, self.args[0], self.args, None)
+            self.proc = reactor.spawnProcess(self, self.proc_args[0], self.proc_args, None)
             self.child_restart()
         except OSError:
             self.console_logger.fatal("Error trying to run: %s"%(" ".join(self.proc_args)))
@@ -73,23 +73,82 @@ class CommandWithOutput(protocol.ProcessProtocol):
             self.console_logger.fatal("Caught exception in CommandWithOutput.run: %s"%str(e))
             raise # FIXME Remove this?
 
-    def shutdown():
+    def shutdown(self):
         self.shutting_down = True
         self.proc.signalProcess("INT")
 
 if __name__ == "__main__":
     import unittest
     from async_helpers import unittest_with_reactor, async_test
+    from twisted.internet.defer import Deferred
 
     class CommandWithOutputTest(unittest.TestCase):
         @async_test
-        def basic_test():
+        def test_basic(self):
+            """Runs a hello command, and checks that Hello gets read, and
+            that child_restart gets called."""
             class Tst(CommandWithOutput):
-                def __init__():
-                    CommandWithOutput.__init__(['ls', '/'], "test")
+                def __init__(self):
+                    self.deferred = Deferred()
+                    self.lines = []
+                    self.starts = 0
+                    CommandWithOutput.__init__(self, ['echo', 'Hello'], "test")
 
-                def got_line():
+                def got_line(self, line):
+                    self.lines.append(line)
+           
+                def child_restart(self):
+                    if self.starts < 2:
+                        self.starts += 1
+                        return
                     self.shutdown()
+                    self.deferred.callback(self.lines)
+
+            lines = yield Tst().deferred
+            self.assertEqual(lines, ['Hello', 'Hello'])
+
+        @async_test
+        def test_kill(self):
+            class Tst(CommandWithOutput):
+                def __init__(self):
+                    self.deferred = Deferred()
+                    self.count = 0
+                    self.second_start = False
+                    CommandWithOutput.__init__(self, ['yes', 'yes'], "test")
+
+                def got_line(self, line):
+                    self.count += 1
+                    if self.count == 100:
+                        self.deferred.callback(self.count)
+                        self.shutdown()
+
+            count = yield Tst().deferred
+            self.assertEqual(count, 100)
+
+        @async_test
+        def test_restart(self):
+            class Tst(CommandWithOutput):
+                def __init__(self):
+                    self.deferred = Deferred()
+                    self.count = 0
+                    self.second_start = False
+                    self.restarts = 0
+                    CommandWithOutput.__init__(self, ['yes', 'yes'], "test")
+
+                def got_line(self, line):
+                    self.count += 1
+                    if self.count == 100:
+                        self.proc.signalProcess("INT")
+                    if self.restarts > 1 and not self.deferred.called:
+                        self.deferred.callback(self.restarts)
+                        self.shutdown()
+                
+                def child_restart(self):
+                    self.restarts += 1
+
+            count = yield Tst().deferred
+            self.assertEqual(count, 2)
+        
 
     def run_ros_tests():
         rostest.unitrun('multi_interface_roam', 'command_with_output', CommandWithOutputTest)

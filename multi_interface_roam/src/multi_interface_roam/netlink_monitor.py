@@ -130,6 +130,7 @@ class NetlinkMonitor(command_with_output.CommandWithOutput):
 monitor = NetlinkMonitor()
 
 if __name__ == "__main__":
+    from twisted.internet import reactor
     iface = 'wlan2'
     try:
         while True:
@@ -137,6 +138,7 @@ if __name__ == "__main__":
                 print monitor.get_raw_state_publisher(iface, i).get(),
                 print monitor.get_state_publisher(iface, i).get(), '  /  ',
             print
-            time.sleep(1)
+            reactor.iterate(1)
     except KeyboardInterrupt:
-        monitor.shutdown()
+        print "Shutting down on CTRL+C"
+        #monitor.shutdown()
