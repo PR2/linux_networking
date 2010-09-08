@@ -84,14 +84,13 @@ class ReadDescrEventStream(EventStream):
             def dataReceived(self, data):
                 put(data)
         self.port = reactor.listenWith(portType, _ReadDescrEventStreamProto(), *args, **kwargs)
-        def cancel():
-            print "Cancel!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
-            self.port.close()
-        self.put.set_deleted_cb(cancel)
+        def cancel(port):
+            port.stopListening()
+        self.put.set_deleted_cb(cancel, self.port)
 
     def recv(self):
         return self.get()[0][0]
-
+    
 @inlineCallbacks
 def select(*events):
     """Listens to the provided EventStreams, and returns a set of integers
@@ -111,7 +110,7 @@ def select(*events):
         for e in events:
             e.stop_listen()
         del events # Needed to avoid creating a cycle when events gets put
-                   # into the traceback associated with returnValue.
+        del e      # into the traceback associated with returnValue.
     returnValue(ready_list)
 
 @inlineCallbacks
@@ -178,30 +177,6 @@ def unittest_with_reactor(run_ros_tests):
     reactor.run()
     sys.exit(exitval[0])
     
-def follow_back(a, n):
-    """Handy function for seeing why an object is still live by walking
-    back through its referrers."""
-    import inspect, gc
-    def print_elem(e):
-        print repr(e)[0:200]
-        try:
-            print e.f_code.co_filename, e.f_lineno
-            #print e.f_locals
-            #print dir(e)
-        except:
-            pass
-    print
-    print "Follow back:"
-    print_elem(a)
-    for i in range(n):
-        r = gc.get_referrers(a)
-        r.remove(inspect.currentframe())
-        print
-        print len(r)
-        for e in r:
-            print_elem(e)
-        a = r[0]
-
 if __name__ == "__main__":
     import unittest
     import threading
@@ -251,17 +226,6 @@ if __name__ == "__main__":
             yield select(Timeout(0.3), Timeout(0.001))
             self.assertEqual(len(reactor.getDelayedCalls()), 0)
             
-
-    def compare_before_after(before, after):
-        """Handy function to compare live objects before and after some
-        operation, to debug why memory is leaking."""
-        beforeids = set(id(e) for e in before)
-        afterids = set(id(e) for e in after)
-        delta = afterids - beforeids - set([id(before)])
-        for e in after:
-            if id(e) in delta:
-                print e
-
     class SelectTest(unittest.TestCase):
         @async_test
         def test_select_param1(self):
