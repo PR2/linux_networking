@@ -54,31 +54,44 @@ class Init(DhcpState):
 
 class Receiving(DhcpState):
     def __init__(self):
-        DhcpState.__init__(self, outcomes=['received'])
+        DhcpState.__init__(self, outcomes=['received', 'exit'])
  
     @inlineCallbacks
     def execute_async(self, ud):
         print "Receiving"
         selectout = yield async_helpers.select(ud.dhcp.socket)
-        print "Select output:", selectout
+        #pkt = ud.dhcp.socket.recv()
+        selectout = yield async_helpers.select(ud.dhcp.socket)
         pkt = ud.dhcp.socket.recv()
         #print repr(scapy.Ether(pkt))
         import weakref, gc
         wr = weakref.ref(ud.dhcp.socket)
         ud.dhcp.stop_socket()
-        print "Weak ref:", wr()
-        async_helpers.follow_back(wr(), 5)
+        #async_helpers.follow_back(wr(), 5)
+        import gcdebug
+        #yield async_helpers.async_sleep(0.1)
+        #sys.exc_clear()
+        #gcdebug.dump_back_reference_graph(wr, 40)
+        #returnValue('exit')
         returnValue('received')
 
 def start_dhcp(iface):
-    sm = smach.StateMachine(outcomes=[], input_keys=['dhcp'])
+    sm = smach.StateMachine(outcomes=['exit'], input_keys=['dhcp'])
     with sm:
         smach.StateMachine.add('INIT', Init(), transitions = {'sent':'RECEIVING'})
         smach.StateMachine.add('RECEIVING', Receiving(), transitions = {'received':'INIT'})
 
     ud = smach.UserData()
     ud.dhcp = DhcpData(iface)
-    sm.execute_async(ud).addCallback(reactor.fireSystemEvent, 'shutdown')
+    def shutdown(value):
+        reactor.fireSystemEvent('shutdown')
+    def ignore_eintr(error):
+        if error.type == IOError:
+            import errno
+            if error.value.errno == errno.EINTR:
+                return None
+        return error
+    sm.execute_async(ud).addCallback(shutdown).addErrback(ignore_eintr)
 
 if __name__ == "__main__":
     import sys
