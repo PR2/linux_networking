@@ -46,6 +46,7 @@ def dump_back_reference_graph(obj, maxdepth):
     
     todo = deque([(obj, 0)])
     strings = {}
+    objects = {}
     depths = {}
     edges = []
     skipped = set()
@@ -56,11 +57,28 @@ def dump_back_reference_graph(obj, maxdepth):
         if type(e) == type(curframe):
             return "frame: %s:%i"%(os.path.basename(e.f_code.co_filename), e.f_lineno)
         if type(e) == dict:
-            return "\n".join("%10s : %20s"%kv for kv in e.iteritems())
-
+            return "\n".join(["%10s : %20s"%(str(k)[0:10], str(v)[0:10]) for k, v in e.iteritems()][0:10])
+        
         #if type(e) == tuple:
         #    return "tuple"
         return str(e)[0:40]
+
+    def list_str_bounded(l, join_str, max_indices, max_elem):
+        l = [str(e)[0:max_elem] for e in l]
+        if len(l) > max_indices:
+            l = l[0:max_indices]
+            l.append('...')
+        return join_str.join(l)
+
+    def edge_string(e1, e2):
+        if type(e1) == list:
+            return list_str_bounded([i for i in range(len(e1)) if e1[i] == e2], ", ", 10, 10)
+
+        if type(e1) == dict:
+            keys = [str(k)[0:20] for (k,v) in e1.iteritems() if e2 == v]
+            return list_str_bounded([k for (k,v) in e1.iteritems() if e2 == v], "\n", 10, 20)
+        
+        return list_str_bounded([a for a in dir(e1) if e1.__getattribute__(a) == e2], "\n", 10, 20)
 
     def dont_trace(e):
         if type(e) == type(inspect):
@@ -74,6 +92,7 @@ def dump_back_reference_graph(obj, maxdepth):
             continue
         strings[ide] = element_string(e)
         depths[ide] = d
+        objects[ide] = e
         if dont_trace(e):
             skipped.add(ide)
             continue
@@ -81,7 +100,7 @@ def dump_back_reference_graph(obj, maxdepth):
         refs = gc.get_referrers(e)
         refs.remove(curframe)
         for r in list(refs):
-            if r in todo:
+            if r in todo or r == objects:
                 refs.remove(r)
         todo.extend((r, d) for r in refs)
         edges.extend((id(r), ide) for r in refs)
@@ -105,12 +124,16 @@ def dump_back_reference_graph(obj, maxdepth):
     
     for (id1, id2) in edges:
         if id1 in nodes and id2 in nodes:
-            nodes[id1] >> nodes[id2]
+            edge = nodes[id1] >> nodes[id2]
+            s = edge_string(objects[id1], objects[id2])
+            if s:
+                edge.label = s
 
     graph.root = str(id(obj))
     #graph.layout(yapgvb.engines.twopi)
     graph.layout(yapgvb.engines.dot)
     graph.render('gcgraph.ps')
+    del objects
 
 if __name__ == "__main__":
     import weakref

@@ -74,7 +74,12 @@ class Timeout(EventStream):
 class Now(EventStream):
     def __init__(self):
         EventStream.__init__(self)
-        self.put()
+        reactor.callLater(0, self.put)
+
+def now():
+    d = Deferred()
+    reactor.callLater(0, d.callback, None)
+    return d
 
 class ReadDescrEventStream(EventStream):
     def __init__(self, portType, *args, **kwargs):
@@ -101,7 +106,9 @@ def select(*events):
     def _select_cb(_, i):
         ready_list.append(i)
         if not done.called:
-            done.callback(None)
+            # We don't do the callback directly or else cycles tend to form
+            # which cause delays in releasing objects.
+            reactor.callLater(0, done.callback, None)
     for i in range(len(events)):
         events[i].listen().addCallback(_select_cb, i)
     try:

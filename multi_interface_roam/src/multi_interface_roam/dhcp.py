@@ -64,11 +64,11 @@ class Receiving(DhcpState):
         selectout = yield async_helpers.select(ud.dhcp.socket)
         pkt = ud.dhcp.socket.recv()
         #print repr(scapy.Ether(pkt))
-        import weakref, gc
-        wr = weakref.ref(ud.dhcp.socket)
+        #import weakref, gc
+        #wr = weakref.ref(ud.dhcp.socket)
         ud.dhcp.stop_socket()
         #async_helpers.follow_back(wr(), 5)
-        import gcdebug
+        #import gcdebug
         #yield async_helpers.async_sleep(0.1)
         #sys.exc_clear()
         #gcdebug.dump_back_reference_graph(wr, 40)
