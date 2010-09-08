@@ -23,7 +23,10 @@ class L2Port:
         self._reactor = reactor
 
     def fileno(self):
-        return self._socket.fileno()
+        if self._socket:
+            return self._socket.fileno()
+        else:
+            return -1
 
     def doRead(self):
         data = self._socket.recv(self._max_size)
@@ -33,13 +36,14 @@ class L2Port:
         self._reactor.addReader(self)
 
     def stopListening(self):
-        self._reactor.delReader(self)
+        self._reactor.removeReader(self)
+        self.connectionLost()
 
     def send(self, data):
         self._socket.send(data)
     
     def connectionLost(self, reason=None):
-        del self._socket
+        self._socket = None
 
     def logPrefix(self):
         return "L2Port"
