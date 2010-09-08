@@ -76,13 +76,18 @@ class Now(EventStream):
         EventStream.__init__(self)
         self.put()
 
-class ReadDescrEventStream(Protocol, EventStream):
+class ReadDescrEventStream(EventStream):
     def __init__(self, portType, *args, **kwargs):
         EventStream.__init__(self)
-        self.port = reactor.listenWith(portType, self, *args, **kwargs)
-
-    def dataReceived(self, data):
-        self._put(data)
+        put = self.put
+        class _ReadDescrEventStreamProto(Protocol):
+            def dataReceived(self, data):
+                put(data)
+        self.port = reactor.listenWith(portType, _ReadDescrEventStreamProto(), *args, **kwargs)
+        def cancel():
+            print "Cancel!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+            self.port.close()
+        self.put.set_deleted_cb(cancel)
 
     def recv(self):
         return self.get()[0][0]
@@ -172,6 +177,30 @@ def unittest_with_reactor(run_ros_tests):
     reactor.callWhenRunning(run_test)
     reactor.run()
     sys.exit(exitval[0])
+    
+def follow_back(a, n):
+    """Handy function for seeing why an object is still live by walking
+    back through its referrers."""
+    import inspect, gc
+    def print_elem(e):
+        print repr(e)[0:200]
+        try:
+            print e.f_code.co_filename, e.f_lineno
+            #print e.f_locals
+            #print dir(e)
+        except:
+            pass
+    print
+    print "Follow back:"
+    print_elem(a)
+    for i in range(n):
+        r = gc.get_referrers(a)
+        r.remove(inspect.currentframe())
+        print
+        print len(r)
+        for e in r:
+            print_elem(e)
+        a = r[0]
 
 if __name__ == "__main__":
     import unittest
@@ -222,30 +251,6 @@ if __name__ == "__main__":
             yield select(Timeout(0.3), Timeout(0.001))
             self.assertEqual(len(reactor.getDelayedCalls()), 0)
             
-
-    def follow_back(a, n):
-        """Handy function for seeing why an object is still live by walking
-        back through its referrers."""
-        import inspect
-        def print_elem(e):
-            print repr(e)[0:200]
-            try:
-                print e.f_lineno
-                #print e.f_locals
-                #print dir(e)
-            except:
-                pass
-        print
-        print "Follow back:"
-        print_elem(a)
-        for i in range(n):
-            r = gc.get_referrers(a)
-            r.remove(inspect.currentframe())
-            print
-            print len(r)
-            for e in r:
-                print_elem(e)
-            a = r[0]
 
     def compare_before_after(before, after):
         """Handy function to compare live objects before and after some

@@ -12,6 +12,7 @@ class DhcpData:
     def __init__(self, iface):
         self.iface = iface
         self.socket = None
+        self.first_time = True
 
     def start_socket(self):
         self.socket = async_helpers.ReadDescrEventStream(l2socket.L2Port, iface = self.iface, filter='udp and dst port 68')
@@ -37,14 +38,15 @@ class DhcpState(smach.State):
     def __init__(self, *args, **kwargs):
         smach.State.__init__(self, input_keys=['dhcp'], output_keys=['dhcp'], *args, **kwargs)
 
-
 class Init(DhcpState):
     def __init__(self):
         DhcpState.__init__(self, outcomes=['sent'])
 
     @inlineCallbacks 
     def execute_async(self, ud):
-        yield async_helpers.async_sleep(1)
+        if ud.dhcp.first_time:
+            ud.dhcp.first_time = False
+            yield async_helpers.async_sleep(1)
         ud.dhcp.start_socket()
         ud.dhcp.hwaddr = monitor.get_state_publisher(ud.dhcp.iface, IFSTATE.LINK_ADDR).get()
         ud.dhcp.send_discover()
@@ -57,10 +59,15 @@ class Receiving(DhcpState):
     @inlineCallbacks
     def execute_async(self, ud):
         print "Receiving"
-        yield async_helpers.select(ud.dhcp.socket)
+        selectout = yield async_helpers.select(ud.dhcp.socket)
+        print "Select output:", selectout
         pkt = ud.dhcp.socket.recv()
-        print scapy.Ether()
+        #print repr(scapy.Ether(pkt))
+        import weakref, gc
+        wr = weakref.ref(ud.dhcp.socket)
         ud.dhcp.stop_socket()
+        print "Weak ref:", wr()
+        async_helpers.follow_back(wr(), 5)
         returnValue('received')
 
 def start_dhcp(iface):
