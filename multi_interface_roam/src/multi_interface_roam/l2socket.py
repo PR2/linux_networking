@@ -7,6 +7,48 @@ from zope.interface import implements
 import scapy.all as scapy
 import event
 import socket
+import sys
+
+# Following code is an optimisation because scapy uses tcpdump to compile bpf filters. The code was pulled from 
+# scapy and plopped down here.
+import os
+import struct
+scapy_arch_linux_module = sys.modules['scapy.arch.linux']
+_orig_attach_filter = scapy_arch_linux_module.attach_filter
+_filter_cache = {}
+
+def _attach_filter_replacement(s, filter):
+    if not scapy_arch_linux_module.TCPDUMP:
+        return
+
+    try:
+        nb, bpf = _filter_cache[filter]
+    except KeyError:
+        try:
+            f = os.popen("%s -i %s -ddd -s 1600 '%s'" % (scapy.conf.prog.tcpdump,scapy.conf.iface,filter))
+        except OSError,msg:
+            log_interactive.warning("Failed to execute tcpdump: (%s)")
+            return
+        lines = f.readlines()
+        if f.close():
+            raise Scapy_Exception("Filter parse error")
+        nb = int(lines[0])
+        bpf = ""
+        for l in lines[1:]:
+            bpf += struct.pack("HBBI",*map(long,l.split()))
+
+        _filter_cache[filter] = (nb, bpf)
+    
+    # XXX. Argl! We need to give the kernel a pointer on the BPF,
+    # python object header seems to be 20 bytes. 36 bytes for x86 64bits arch.
+    if scapy.arch.X86_64:
+        bpfh = struct.pack("HL", nb, id(bpf)+36)
+    else:
+        bpfh = struct.pack("HI", nb, id(bpf)+20)  
+    s.setsockopt(scapy_arch_linux_module.SOL_SOCKET, scapy_arch_linux_module.SO_ATTACH_FILTER, bpfh)
+
+scapy_arch_linux_module.attach_filter = _attach_filter_replacement
+# End of the horrid optimization
 
 class AlreadyClosed(Exception):
     pass
