@@ -107,7 +107,7 @@ def select(*events):
         ready_list.append(i)
         if not done.called:
             # We don't do the callback directly or else cycles tend to form
-            # which cause delays in releasing objects.
+            # which cause delays in releasing objects. 
             reactor.callLater(0, done.callback, None)
     for i in range(len(events)):
         events[i].listen().addCallback(_select_cb, i)
