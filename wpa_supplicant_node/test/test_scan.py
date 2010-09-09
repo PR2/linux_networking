@@ -31,7 +31,7 @@ class Test:
         print "Requesting scan..."
         #rospy.loginfo("Sending goal.")
         self.scan_action.send_goal(goal)
-        print "Requesting scan..."
+        #print "Requesting scan..."
         #rospy.loginfo("Waiting for result.")
         self.scan_action.wait_for_result()
         end = rospy.get_time()
@@ -52,7 +52,7 @@ class Test:
 
         #rospy.loginfo("Associating to %s:"%bssid_to_str(bss.bssid))
         print "Associating to %12s %s %4i"%(bss.ssid, bssid_to_str(bss.bssid), bss.frequency),
-        self.assoc_action.send_goal(wpa_supplicant_node.msg.AssociateGoal(bss), feedback_cb=self.associated)
+        self.assoc_action.send_goal(wpa_supplicant_node.msg.AssociateGoal(bssid = bss.bssid, ssid = bss.ssid), feedback_cb=self.associated)
         failed = False
         while not self.assoc_count:
             state = self.assoc_action.get_state() 
