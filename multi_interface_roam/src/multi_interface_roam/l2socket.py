@@ -13,7 +13,10 @@ import sys
 # scapy and plopped down here.
 import os
 import struct
-scapy_arch_linux_module = sys.modules['scapy.arch.linux']
+try:
+    scapy_arch_linux_module = sys.modules['scapy.arch.linux']
+except:
+    scapy_arch_linux_module = sys.modules['scapy.arch']
 _orig_attach_filter = scapy_arch_linux_module.attach_filter
 _filter_cache = {}
 
