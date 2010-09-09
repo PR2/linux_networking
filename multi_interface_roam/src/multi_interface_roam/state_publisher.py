@@ -6,6 +6,8 @@ import event
 
 # TODO
 # - Make CompositeStatePublisher so it can be garbage collected.
+# - Add test for Unsubscribe exception, in particular case whene it is
+# raised directly from subscribe.
 
 class StatePublisher():
     def __init__(self, init_state):
@@ -28,7 +30,10 @@ class StatePublisher():
         h = self._event.subscribe_repeating(f, *args, **kwargs)
         allkwargs = {'old_state' : None, 'new_state' : self._state}
         allkwargs.update(kwargs)
-        f(*args, **allkwargs)
+        try:
+            f(*args, **allkwargs)
+        except event.Unsubscribe:
+            h.unsubscribe()
         return h
 
 class CompositeStatePublisher(StatePublisher):

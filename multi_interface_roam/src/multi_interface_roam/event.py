@@ -65,7 +65,10 @@ class _EventDispatcher:
             # the subscribe call have precedence.
             allkwargs = dict(kwargs)
             allkwargs.update(firstkwargs)
-            cb(*allargs, **allkwargs)
+            try:
+                cb(*allargs, **allkwargs)
+            except Unsubscribe:
+                repeating = False
             if not repeating:
                 del self._subscribers[h]
                 h._auto_unsubscribed = True
