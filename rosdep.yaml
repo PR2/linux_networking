@@ -5,7 +5,10 @@ libnl-dev:
   ubuntu: libnl-dev
 
 libreadline-dev:
-  ubuntu: libreadline-dev
+  ubuntu:
+    '10.04': libreadline-dev
+    '9.10':  libreadline5-dev
+    '9.04':  libreadline-dev
 
 udhcpc:
   ubuntu: udhcpc
