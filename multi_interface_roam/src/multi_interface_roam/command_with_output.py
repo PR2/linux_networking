@@ -27,6 +27,7 @@ class CommandWithOutput(protocol.ProcessProtocol):
         self.outline = ""
         self.errline = ""
         self.shutting_down = False
+        self.proc = None
         reactor.addSystemEventTrigger('during', 'shutdown', self.shutdown)
         reactor.callWhenRunning(self.start_proc)
                             
@@ -76,7 +77,8 @@ class CommandWithOutput(protocol.ProcessProtocol):
 
     def shutdown(self):
         self.shutting_down = True
-        self.proc.signalProcess("INT")
+        if self.proc:
+            self.proc.signalProcess("INT")
 
 if __name__ == "__main__":
     import unittest
