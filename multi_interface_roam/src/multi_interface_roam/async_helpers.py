@@ -134,11 +134,13 @@ def select(*events):
     one that is ready."""
     ready_list = []
     done = Deferred()
+    done_called = []
     def _select_cb(_, i):
         ready_list.append(i)
-        if not done.called:
+        if not done_called:
             # We don't do the callback directly or else cycles tend to form
             # which cause delays in releasing objects. 
+            done_called.append(None)
             reactor.callLater(0, done.callback, None)
     for i in range(len(events)):
         events[i].listen().addCallback(_select_cb, i)
@@ -197,6 +199,7 @@ def unittest_with_reactor(run_ros_tests):
         try:
             if len(sys.argv) > 1 and sys.argv[1].startswith("--gtest_output="):
                 import roslib; roslib.load_manifest('multi_interface_roam')
+                global rostest
                 import rostest
                 run_ros_tests()
             else:
@@ -220,8 +223,8 @@ if __name__ == "__main__":
     import threading
     import sys
     import gc
-    from twisted.internet.defer import setDebugging
-    setDebugging(True)
+    #from twisted.internet.defer import setDebugging
+    #setDebugging(True)
 
     class EventStreamTest(unittest.TestCase):
         def test_dies_despite_cb(self):
