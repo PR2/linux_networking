@@ -12,7 +12,7 @@ class DhcpData:
     def __init__(self, iface):
         self.iface = iface
         self.socket = None
-        self.first_time = True
+        self.link_addr_state = monitor.get_state_publisher(self.iface, IFSTATE.LINK_ADDR) 
 
     def start_socket(self):
         self.socket = async_helpers.ReadDescrEventStream(l2socket.L2Port, iface = self.iface, filter='udp and dst port 68')
@@ -38,48 +38,117 @@ class DhcpState(smach.State):
     def __init__(self, *args, **kwargs):
         smach.State.__init__(self, input_keys=['dhcp'], output_keys=['dhcp'], *args, **kwargs)
 
-class Init(DhcpState):
+class Linkless(DhcpState):
     def __init__(self):
-        DhcpState.__init__(self, outcomes=['sent'])
-
-    @inlineCallbacks 
-    def execute_async(self, ud):
-        if ud.dhcp.first_time:
-            ud.dhcp.first_time = False
-            yield async_helpers.async_sleep(1)
-        ud.dhcp.start_socket()
-        ud.dhcp.hwaddr = monitor.get_state_publisher(ud.dhcp.iface, IFSTATE.LINK_ADDR).get()
-        ud.dhcp.send_discover()
-        returnValue('sent')
-
-class Receiving(DhcpState):
-    def __init__(self):
-        DhcpState.__init__(self, outcomes=['received', 'exit'])
+        DhcpState.__init__(self, outcomes=['got_replies', 'no_replies'])
  
     @inlineCallbacks
     def execute_async(self, ud):
-        print "Receiving"
-        selectout = yield async_helpers.select(ud.dhcp.socket)
-        #pkt = ud.dhcp.socket.recv()
+        pass
+
+
+
+class InitReboot(DhcpState):
+    def __init__(self):
+        DhcpState.__init__(self, outcomes=['got_replies', 'no_replies'])
+ 
+    @inlineCallbacks
+    def execute_async(self, ud):
+        pass
+
+
+
+class Rebooting(DhcpState):
+    def __init__(self):
+        DhcpState.__init__(self, outcomes=['got_replies', 'no_replies'])
+ 
+    @inlineCallbacks
+    def execute_async(self, ud):
+        pass
+
+
+
+class Init(DhcpState):
+    def __init__(self):
+        DhcpState.__init__(self, outcomes=['done'])
+
+    @inlineCallbacks 
+    def execute_async(self, ud):
+        ud.dhcp.hwaddr = yield async_helpers.wait_for_state(ud.dhcp.link_addr_state, False, True)
+        returnValue('done')
+
+
+
+class Selecting(DhcpState):
+    def __init__(self):
+        DhcpState.__init__(self, outcomes=['got_replies', 'no_replies'])
+ 
+    @inlineCallbacks
+    def execute_async(self, ud):
+        pass
+
+
+
+class Requesting(DhcpState):
+    def __init__(self):
+        DhcpState.__init__(self, outcomes=['got_replies', 'no_replies'])
+ 
+    @inlineCallbacks
+    def execute_async(self, ud):
+        ud.dhcp.start_socket()
+        ud.dhcp.send_discover()
         selectout = yield async_helpers.select(ud.dhcp.socket)
         pkt = ud.dhcp.socket.recv()
-        #print repr(scapy.Ether(pkt))
-        #import weakref, gc
-        #wr = weakref.ref(ud.dhcp.socket)
         ud.dhcp.stop_socket()
-        #async_helpers.follow_back(wr(), 5)
-        #import gcdebug
-        #yield async_helpers.async_sleep(0.1)
-        #sys.exc_clear()
-        #gcdebug.dump_back_reference_graph(wr, 40)
-        #returnValue('exit')
-        returnValue('received')
+        returnValue('got_replies')
+
+
+
+class Bound(DhcpState):
+    def __init__(self):
+        DhcpState.__init__(self, outcomes=['got_replies', 'no_replies'])
+ 
+    @inlineCallbacks
+    def execute_async(self, ud):
+        pass
+
+
+
+class Renewing(DhcpState):
+    def __init__(self):
+        DhcpState.__init__(self, outcomes=['got_replies', 'no_replies'])
+ 
+    @inlineCallbacks
+    def execute_async(self, ud):
+        pass
+
+
+
+class Rebinding(DhcpState):
+    def __init__(self):
+        DhcpState.__init__(self, outcomes=['got_replies', 'no_replies'])
+ 
+    @inlineCallbacks
+    def execute_async(self, ud):
+        pass
+
+
+
+class Error(DhcpState):
+    def __init__(self):
+        DhcpState.__init__(self, outcomes=['got_replies', 'no_replies'])
+ 
+    @inlineCallbacks
+    def execute_async(self, ud):
+        pass
+
+
 
 def start_dhcp(iface):
     sm = smach.StateMachine(outcomes=['exit'], input_keys=['dhcp'])
     with sm:
-        smach.StateMachine.add('INIT', Init(), transitions = {'sent':'RECEIVING'})
-        smach.StateMachine.add('RECEIVING', Receiving(), transitions = {'received':'INIT'})
+        smach.StateMachine.add('INIT', Init(), transitions = {'done':'REQUESTING'})
+        smach.StateMachine.add('REQUESTING', Requesting(), transitions = {'got_replies':'INIT', 'no_replies':'INIT'})
 
     ud = smach.UserData()
     ud.dhcp = DhcpData(iface)

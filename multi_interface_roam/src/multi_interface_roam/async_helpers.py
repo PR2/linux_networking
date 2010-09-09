@@ -6,6 +6,7 @@ from collections import deque
 from weakcallback import WeakCallbackCb
 import weakref
 import sys
+from event import Unsubscribe
 
 # FIXME Add test for ReadDescrEventStream
 
@@ -21,6 +22,20 @@ def event_queue(event):
     h = event.subscribe_repeating(cb)
     q.unsubscribe = h.unsubscribe
     return q
+
+def now():
+    d = Deferred()
+    reactor.callLater(0, d.callback, None)
+    return d
+
+def wait_for_state(state, target, invert = False):
+    d = Deferred()
+    def cb(old_state, new_state):
+        if (new_state == target) != invert:
+            d.callback(new_state)
+            raise Unsubscribe
+    state.subscribe(cb)
+    return d
 
 class EventStream:
     """Event stream class to be used with select and switch."""
@@ -75,11 +90,6 @@ class Now(EventStream):
     def __init__(self):
         EventStream.__init__(self)
         reactor.callLater(0, self.put)
-
-def now():
-    d = Deferred()
-    reactor.callLater(0, d.callback, None)
-    return d
 
 class ReadDescrEventStream(EventStream):
     def __init__(self, portType, *args, **kwargs):
