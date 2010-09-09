@@ -43,21 +43,31 @@ class EventStream:
         self._queue = deque()
         self._invoke_listener = None
         self.put = WeakCallbackCb(self._put)
+        self.discard = False
 
     def _put(*args, **kwargs):
+        """Puts an element into the queue, and notifies an eventual
+        listener. Use pop rather than _pop or you will create cycles and
+        prevent reference counts from going to zero."""
         self = args[0]
+        if self.discard:
+            return
         self._queue.append((args[1:], kwargs))
         if self._invoke_listener:
             self._trigger()
 
     def get(self):
+        """Pops the next element off the queue."""
         return self._queue.popleft()
     
     def _trigger(self):
+        """Used internally to to trigger the callback."""
         self._invoke_listener.callback(None)
         self._invoke_listener = None
 
     def listen(self):
+        """Returns a Deferred that will be called the next time an event
+        arrives, possibly immediately."""
         if self._invoke_listener:
             raise Exception("Event stream in use from multiple places simultaneously.")
         d = self._invoke_listener = Deferred()
@@ -66,8 +76,16 @@ class EventStream:
         return d # Using d because self._trigger() may change self._invoke_listener
 
     def stop_listen(self):
+        """Discards the Deferred set by listen."""
         assert self._invoke_listener or self._queue
         self._invoke_listener = None
+
+    def set_discard(self, discard):
+        """Tells the event stream whether it should discard all queued and
+        incoming events."""
+        self.discard = discard
+        if discard:
+            self._queue = deque()
 
 class EventStreamFromDeferred(EventStream):
     def __init__(self, d = None):
@@ -76,6 +94,9 @@ class EventStreamFromDeferred(EventStream):
             d = Deferred()
         self.deferred = d
         d.addCallback(self.put)
+
+def StateCondition(state, target, invert = False):
+    return EventStreamFromDeferred(wait_for_state(state, target, invert))
 
 class Timeout(EventStream):
     def __init__(self, timeout):
