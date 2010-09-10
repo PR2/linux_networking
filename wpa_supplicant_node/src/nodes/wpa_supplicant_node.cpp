@@ -180,7 +180,7 @@ private:
   std::vector<int> current_scan_frequencies_;
 
 // Associate Action
-  boost::mutex associate_mutex_;
+  boost::recursive_mutex associate_mutex_;
   AssociateActionServer aas_;
   AssociateActionServer::GoalHandle active_association_;
   bool associate_work_requested_;
@@ -263,7 +263,7 @@ public:
   void assocFailed(const u8 *bssid, const char *s)
   {
     ROS_INFO("assocFailed");
-    boost::mutex::scoped_lock lock(associate_mutex_);
+    boost::recursive_mutex::scoped_lock lock(associate_mutex_);
     
     if (active_association_ == null_associate_goal_handle_)
     {
@@ -286,7 +286,7 @@ public:
   void assocSucceeded(const u8 *bssid)
   {
     ROS_INFO("assocSucceeded");
-    boost::mutex::scoped_lock lock(associate_mutex_);
+    boost::recursive_mutex::scoped_lock lock(associate_mutex_);
 
     wpa_supplicant_node::AssociateFeedback fbk;
     fbk.associated = true;
@@ -430,10 +430,10 @@ private:
     {
       gh.setAccepted();
       active_association_ = gh;
-      wpa_supplicant_associate(wpa_s_, bss, net);
       wpa_supplicant_node::AssociateFeedback fbk;
       fbk.associated = false;
       active_association_.publishFeedback(fbk);
+      wpa_supplicant_associate(wpa_s_, bss, net);
     }
     else
     {
@@ -447,7 +447,7 @@ private:
 
   void associateWork()
   {
-    boost::mutex::scoped_lock lock(associate_mutex_);
+    boost::recursive_mutex::scoped_lock lock(associate_mutex_);
     lockedAssociateWork();
   }
 
@@ -495,7 +495,7 @@ private:
 
   void associateGoalCallback(AssociateActionServer::GoalHandle &gh)
   {
-    boost::mutex::scoped_lock lock(associate_mutex_);
+    boost::recursive_mutex::scoped_lock lock(associate_mutex_);
     
     associate_goal_queue_.push(gh);
     requestAssociateWork();
@@ -503,7 +503,7 @@ private:
 
   void associateCancelCallback(AssociateActionServer::GoalHandle &gh)
   {
-    boost::mutex::scoped_lock lock(associate_mutex_);
+    boost::recursive_mutex::scoped_lock lock(associate_mutex_);
     
     associate_cancel_queue_.push(gh);
     requestAssociateWork();
