@@ -433,6 +433,9 @@ private:
       wpa_supplicant_node::AssociateFeedback fbk;
       fbk.associated = false;
       active_association_.publishFeedback(fbk);
+
+      // Note, the following line may involve a call to assocFailed, so
+      // everything needs to be in a consistent state before we call it.
       wpa_supplicant_associate(wpa_s_, bss, net);
     }
     else
