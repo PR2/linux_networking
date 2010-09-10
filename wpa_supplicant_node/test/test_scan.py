@@ -87,8 +87,8 @@ if __name__ == '__main__':
         t = Test(iface)                  
         while True:
             result = t.scan([], [2437, 2462, 5240, 5765])
-            if not result.bss:
-                raise Exception("No scan output!")
+            #if not result.bss:
+            #    raise Exception("No scan output!")
             #print result
             for i in range(0,5):
                 for bss in result.bss:
@@ -98,7 +98,8 @@ if __name__ == '__main__':
                       #"00:24:6C:81:4E:FA", # willow-wpa2
                       #"00:24:6C:81:D5:E0", # willow
                       #"00:24:6C:81:D5:EA", # willow-wpa2
-                      "00:24:6C:81:D5:E8", # willow
+                      #"00:24:6C:81:D5:E8", # willow blaise-office
+                      "00:24:6C:82:4E:F8", # willow lab
                       ]
                     essidlist = [
                       #"willow-wpa2",
