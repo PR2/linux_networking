@@ -25,6 +25,10 @@ rosbuild_add_pyunit(src/multi_interface_roam/event.py)
 rosbuild_add_pyunit(src/multi_interface_roam/state_publisher.py)
 rosbuild_add_pyunit(src/multi_interface_roam/async_helpers.py)
 
+rosbuild_find_ros_package(dynamic_reconfigure)
+include(${dynamic_reconfigure_PACKAGE_PATH}/cmake/cfgbuild.cmake)
+gencfg()
+
 #common commands for building c++ executables and libraries
 #rosbuild_add_library(${PROJECT_NAME} src/example.cpp)
 #target_link_libraries(${PROJECT_NAME} another_library)
