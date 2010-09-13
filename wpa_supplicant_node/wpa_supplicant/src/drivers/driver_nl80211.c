@@ -1692,8 +1692,9 @@ static int wpa_driver_nl80211_scan(void *priv,
 		NLA_PUT(ssids, i + 1, params->ssids[i].ssid_len,
 			params->ssids[i].ssid);
 	}
-	if (params->num_ssids)
-		nla_put_nested(msg, NL80211_ATTR_SCAN_SSIDS, ssids);
+        if (!params->num_ssids)
+          NLA_PUT(ssids, 1, 0, "");
+	nla_put_nested(msg, NL80211_ATTR_SCAN_SSIDS, ssids);
 
 	if (params->extra_ies) {
 		wpa_hexdump_ascii(MSG_MSGDUMP, "nl80211: Scan extra IEs",
