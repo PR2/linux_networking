@@ -4,6 +4,7 @@ import rospy
 import actionlib
 import wpa_supplicant_node.msg
 from actionlib_msgs.msg import GoalStatus
+import os
 
 def bssid_to_str(bssid):
     return ":".join(["%02X"%ord(c) for c in bssid])
@@ -26,9 +27,10 @@ class Test:
             goal.ssids.append(s)
         for f in freq:
             goal.frequencies.append(f)
-        
-        start = rospy.get_time()
+            
         print "Requesting scan..."
+        rospy.sleep(rospy.Duration(1))
+        start = rospy.get_time()
         #rospy.loginfo("Sending goal.")
         self.scan_action.send_goal(goal)
         #print "Requesting scan..."
@@ -42,7 +44,7 @@ class Test:
     def associated(self, feedback):
         if feedback.associated:
             end = rospy.get_time()
-            rospy.loginfo("Association took %.3f seconds."%(end - self.assoc_start))
+            print "Association took %.3f seconds."%(end - self.assoc_start),
             self.assoc_count += 1
     
     def associate(self, bss):
@@ -52,6 +54,7 @@ class Test:
 
         #rospy.loginfo("Associating to %s:"%bssid_to_str(bss.bssid))
         print "Associating to %12s %s %4i"%(bss.ssid, bssid_to_str(bss.bssid), bss.frequency),
+        sys.stdout.flush()
         self.assoc_action.send_goal(wpa_supplicant_node.msg.AssociateGoal(bssid = bss.bssid, ssid = bss.ssid), feedback_cb=self.associated)
         failed = False
         while not self.assoc_count:
@@ -61,11 +64,15 @@ class Test:
                 break
             rospy.sleep(rospy.Duration(0.1))
 
+        rospy.sleep(rospy.Duration(0.5))
+        
         if not failed:
             #rospy.sleep(rospy.Duration(2.2))
     
+            #os.system('ifconfig %s down'%iface)
+            #os.system('ifconfig %s up'%iface)
             self.assoc_action.cancel_goal()
-            rospy.sleep(rospy.Duration(0.5))
+            rospy.sleep(rospy.Duration(0.25))
     
             if self.assoc_count > 1:
                 print
@@ -84,9 +91,27 @@ if __name__ == '__main__':
         rospy.init_node('test_scan')
         import sys
         iface = sys.argv[1]
-        t = Test(iface)                  
-        while True:
-            result = t.scan([], [2437, 2462, 5240, 5765])
+        t = Test(iface)              
+        count = 0
+        while not rospy.is_shutdown():
+            count += 1
+            #if count % 2:
+            #    result = t.scan([], [5805])
+            #else:
+            #    result = t.scan([], [2437])
+            #result = t.scan([], [])
+            #result = t.scan([], [5260, 5805])
+            result = t.scan([], [5260, 5805, 2437])
+            #if count > 1:
+            print len(result.bss)
+            #    rospy.sleep(rospy.Duration(0.5))
+            #    continue
+            #rospy.sleep(rospy.Duration(0.2))
+            #continue
+            #for b in result.bss:
+            #    print "%s %s"%(bssid_to_str(b.bssid), b.ssid)
+            #continue
+            #result = t.scan([], [2437, 2462, 5240, 5260, 5805])
             #if not result.bss:
             #    raise Exception("No scan output!")
             #print result

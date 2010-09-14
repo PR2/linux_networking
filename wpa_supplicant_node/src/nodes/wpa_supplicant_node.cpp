@@ -173,7 +173,7 @@ private:
   ros::NodeHandle nh_;
 
 //Scan Action
-  boost::mutex scan_mutex_;
+  boost::recursive_mutex scan_mutex_;
   ScanActionServer sas_;
   std::queue<ScanActionServer::GoalHandle> scan_queue_;
   ScanActionServer::GoalHandle current_scan_;
@@ -235,7 +235,9 @@ public:
   {
     ROS_INFO("scanCompleted");
 
-    boost::mutex::scoped_lock lock(scan_mutex_);
+    boost::recursive_mutex::scoped_lock lock(scan_mutex_);
+    
+    eloop_cancel_timeout(scanTimeoutHandler, wpa_s_, NULL);
     
     if (current_scan_ == null_scan_goal_handle_)
       ROS_ERROR("scanCmopleted with current_scan_ not set.");
@@ -265,6 +267,8 @@ public:
     ROS_INFO("assocFailed");
     boost::recursive_mutex::scoped_lock lock(associate_mutex_);
     
+    eloop_cancel_timeout(associateTimeoutHandler, wpa_s_, NULL);
+    
     if (active_association_ == null_associate_goal_handle_)
     {
       ROS_ERROR("Got disassociation with no active association on BSSID: " MACSTR " (%s)", MAC2STR(bssid), s);
@@ -287,6 +291,8 @@ public:
   {
     ROS_INFO("assocSucceeded");
     boost::recursive_mutex::scoped_lock lock(associate_mutex_);
+    
+    eloop_cancel_timeout(associateTimeoutHandler, wpa_s_, NULL);
 
     wpa_supplicant_node::AssociateFeedback fbk;
     fbk.associated = true;
@@ -434,6 +440,8 @@ private:
       fbk.associated = false;
       active_association_.publishFeedback(fbk);
 
+      eloop_register_timeout(5, 0, associateTimeoutHandler, wpa_s_, NULL);
+      
       // Note, the following line may involve a call to assocFailed, so
       // everything needs to be in a consistent state before we call it.
       wpa_supplicant_associate(wpa_s_, bss, net);
@@ -446,6 +454,7 @@ private:
         ROS_ERROR("startActiveAssociation could not find requested ssid.");
       gh.setRejected();
     }
+    ROS_INFO("startActiveAssociation() done");
   }
 
   void associateWork()
@@ -537,7 +546,7 @@ private:
 
   void scanGoalCallback(ScanActionServer::GoalHandle &gh)
   {
-    boost::mutex::scoped_lock lock(scan_mutex_);
+    boost::recursive_mutex::scoped_lock lock(scan_mutex_);
     
     ROS_INFO("scanGoalCallback()");
 
@@ -549,7 +558,7 @@ private:
 
   void scanCancelCallback(ScanActionServer::GoalHandle &gh)
   {
-    boost::mutex::scoped_lock lock(scan_mutex_);
+    boost::recursive_mutex::scoped_lock lock(scan_mutex_);
 
     unsigned int status = gh.getGoalStatus().status;
 
@@ -568,7 +577,7 @@ private:
   void scanCancel(ScanActionServer::GoalHandle &gh)
   {
     ROS_INFO("scanCancel()");
-    boost::mutex::scoped_lock lock(scan_mutex_);
+    boost::recursive_mutex::scoped_lock lock(scan_mutex_);
     
     // Are we still active (we may have succeeded before getting here)?
     if (current_scan_ == gh)
@@ -610,9 +619,16 @@ private:
       {
         current_scan_.setAccepted();
                                 
-        // FIXME Copy set of ESSIDs and freqs to scan.
-        
         ROS_INFO("Starting scan.");
+        // The following timeout should never get used, as there is a
+        // nearly identical one in the scan code. It is nevertheless here
+        // just in case.
+        int timeout;
+        if (wpa_req.freqs == 0)
+          timeout = 10000;
+        else
+          timeout = goal->frequencies.size() * 250;
+        eloop_register_timeout(timeout / 1000, 1000 * (timeout % 1000), scanTimeoutHandler, wpa_s_, NULL);
         wpa_supplicant_trigger_scan(wpa_s_, &wpa_req);
       }
       else
@@ -628,6 +644,18 @@ private:
       ROS_INFO("scan_queue_ is empty.");
     if (current_scan_ != null_scan_goal_handle_)
       ROS_INFO("A scan is active.");
+  }
+
+  static void scanTimeoutHandler(void *wpa_s, void *unused)
+  {
+    ROS_INFO("Scan timeout!");
+    ((wpa_supplicant *) wpa_s)->ros_api->scanCompleted(NULL);
+  }
+ 
+  static void associateTimeoutHandler(void *wpa_s, void *unused)
+  {
+    ROS_INFO("Associate timeout!");
+    ((wpa_supplicant *) wpa_s)->ros_api->scanCompleted(NULL);
   }
  
   std::string fillWpaReq(boost::shared_ptr<const wpa_supplicant_node::ScanGoal> &g, struct wpa_driver_scan_params &wpa_req)
@@ -656,7 +684,7 @@ private:
       for (int i = 0; i < num_frequencies; i++)
         current_scan_frequencies_.push_back(g->frequencies[i]);
       current_scan_frequencies_.push_back(0);
-      wpa_req.freqs = &current_scan_frequencies_[0];
+      wpa_req.freqs = &current_scan_frequencies_[0]; // Use wpa_req before the goal dies!
     }
   
     return "";
@@ -664,7 +692,7 @@ private:
 
   void scanTryActivate()
   {
-    boost::mutex::scoped_lock lock(scan_mutex_);
+    boost::recursive_mutex::scoped_lock lock(scan_mutex_);
     lockedScanTryActivate();
   }
 };

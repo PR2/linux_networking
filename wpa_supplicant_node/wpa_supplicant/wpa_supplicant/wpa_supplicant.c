@@ -552,6 +552,11 @@ void wpa_supplicant_set_state(struct wpa_supplicant *wpa_s,
 		wpa_s->new_connection = 1;
 		wpa_drv_set_operstate(wpa_s, 0);
 	}
+        if (state == WPA_DISCONNECTED)
+        {
+          ros_assoc_failed(wpa_s, wpa_s->pending_bssid, "Entered disconnected state.");
+        }
+
 	wpa_s->wpa_state = state;
 
 	if (wpa_s->wpa_state != old_state)

@@ -1664,6 +1664,7 @@ static int wpa_driver_nl80211_scan(void *priv,
 	int ret = 0, timeout;
 	struct nl_msg *msg, *ssids, *freqs;
 	size_t i;
+        int num_freqs = 0;
 
 	msg = nlmsg_alloc();
 	ssids = nlmsg_alloc();
@@ -1709,6 +1710,7 @@ static int wpa_driver_nl80211_scan(void *priv,
 				   "MHz", params->freqs[i]);
 			NLA_PUT_U32(freqs, i + 1, params->freqs[i]);
 		}
+                num_freqs = i;
 		nla_put_nested(msg, NL80211_ATTR_SCAN_FREQUENCIES, freqs);
 	}
 
@@ -1745,19 +1747,13 @@ static int wpa_driver_nl80211_scan(void *priv,
 
 	/* Not all drivers generate "scan completed" wireless event, so try to
 	 * read results after a timeout. */
-	timeout = 10;
-	if (drv->scan_complete_events) {
-		/*
-		 * The driver seems to deliver events to notify when scan is
-		 * complete, so use longer timeout to avoid race conditions
-		 * with scanning and following association request.
-		 */
-		timeout = 30;
-	}
-	wpa_printf(MSG_DEBUG, "Scan requested (ret=%d) - scan timeout %d "
+	timeout = 10000;
+	if (num_freqs)
+          timeout = num_freqs * 250;
+        wpa_printf(MSG_DEBUG, "Scan requested (ret=%d) - scan timeout %d "
 		   "seconds", ret, timeout);
 	eloop_cancel_timeout(wpa_driver_nl80211_scan_timeout, drv, drv->ctx);
-	eloop_register_timeout(timeout, 0, wpa_driver_nl80211_scan_timeout,
+	eloop_register_timeout(timeout / 1000, (timeout % 1000) * 1000, wpa_driver_nl80211_scan_timeout,
 			       drv, drv->ctx);
 
 nla_put_failure:
