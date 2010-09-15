@@ -655,7 +655,8 @@ private:
   static void associateTimeoutHandler(void *wpa_s, void *unused)
   {
     ROS_INFO("Associate timeout!");
-    ((wpa_supplicant *) wpa_s)->ros_api->associateCompleted(NULL);
+    static const u8 zeroMAC[] = "\0\0\0\0\0\0";
+    ((wpa_supplicant *) wpa_s)->ros_api->assocFailed(zeroMAC, "Associatiot timed out.");
   }
  
   std::string fillWpaReq(boost::shared_ptr<const wpa_supplicant_node::ScanGoal> &g, struct wpa_driver_scan_params &wpa_req)
