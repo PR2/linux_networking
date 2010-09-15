@@ -3,11 +3,17 @@
 from __future__ import with_statement
 
 import event
+import copy
 
 # TODO
 # - Make CompositeStatePublisher so it can be garbage collected.
 # - Add test for Unsubscribe exception, in particular case whene it is
 # raised directly from subscribe.
+# - Add test for CompositeStatePublisher.
+# - Add test that mutable states get copied when stored into old_state.
+
+class JustSubscribed:
+    pass
 
 class StatePublisher():
     def __init__(self, init_state):
@@ -20,7 +26,7 @@ class StatePublisher():
     def set(self, new_state):
         if self._state != new_state:
             old_state = self._state
-            self._state = new_state
+            self._state = copy.deepcopy(new_state)
             self._event.trigger(old_state = old_state, new_state = new_state)
             self._setting_thread = None
 
@@ -28,7 +34,7 @@ class StatePublisher():
         f = args[0]
         args = args[1:]
         h = self._event.subscribe_repeating(f, *args, **kwargs)
-        allkwargs = {'old_state' : None, 'new_state' : self._state}
+        allkwargs = {'old_state' : JustSubscribed, 'new_state' : self._state}
         allkwargs.update(kwargs)
         try:
             f(*args, **allkwargs)
@@ -41,7 +47,7 @@ class CompositeStatePublisher(StatePublisher):
         StatePublisher.__init__(self, None)
         n = len(state_publishers)
         self._func = func
-        self._states = n * [ None ]
+        self._states = n * [ JustSubscribed ]
         self._has_been_set = n * [ False ]
         for i in range(0, n):
            state_publishers[i].subscribe(self._cb, i) 
@@ -82,8 +88,8 @@ if __name__ == "__main__":
             s.set(2)
             h2.unsubscribe()
             self.assertEqual(l, [
-                (None, False),
-                (None, False),
+                (JustSubscribed, False),
+                (JustSubscribed, False),
                 (False, 1),
                 (False, 1),
                 (1, 2),
@@ -98,7 +104,7 @@ if __name__ == "__main__":
             s1.set(1)
             s2.set(2)
             s1.set(5)
-            self.assertEqual(l, [ (None, 0), (0, 1), (1, 3), (3, 7) ])
+            self.assertEqual(l, [ (JustSubscribed, 0), (0, 1), (1, 3), (3, 7) ])
 
     if len(sys.argv) > 1 and sys.argv[1].startswith("--gtest_output="):
         import roslib; roslib.load_manifest('multi_interface_roam')
