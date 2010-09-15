@@ -17,25 +17,18 @@ class RunCommand:
         (self.stdout, self.stderr) = proc.communicate()
 
 class IFSTATE:
-    PLUGGED   = 0
-    UP        = 1
-    LINK      = 2
-    LINK_ADDR = 3
-    ADDR      = 4
-    COUNT     = 5
+    PLUGGED    = 0
+    UP         = 1
+    LINK       = 2
+    LINK_ADDR  = 3
+    ADDR       = 4
+    NUM_STATES = 5
 
 class NetlinkMonitor(command_with_output.CommandWithOutput):
-    IFSTATE.PLUGGED = 0
-    IFSTATE.UP = IFSTATE.PLUGGED + 1
-    IFSTATE.LINK = IFSTATE.UP + 1
-    IFSTATE.LINK_ADDR = IFSTATE.LINK + 1
-    IFSTATE.ADDR = IFSTATE.LINK_ADDR + 1
-    IFSTATE.COUNT = IFSTATE.ADDR + 1
-
     def __init__(self):
         self.lock = threading.RLock()
-        self.raw_state_publishers = [ {} for i in range(0, IFSTATE.COUNT)]
-        self.state_publishers = [ {} for i in range(0, IFSTATE.COUNT)]
+        self.raw_state_publishers = [ {} for i in range(0, IFSTATE.NUM_STATES)]
+        self.state_publishers = [ {} for i in range(0, IFSTATE.NUM_STATES)]
         self.cur_iface = None
         self.deleted = None
         command_with_output.CommandWithOutput.__init__(self, ['ip', 'monitor', 'link', 'addr'], 'ip_monitor')
@@ -131,14 +124,17 @@ monitor = netlink_monitor = NetlinkMonitor()
 
 if __name__ == "__main__":
     from twisted.internet import reactor
-    iface = 'wlan2'
+    iface = 'lo'
     try:
-        while True:
-            for i in range(0,IFSTATE.COUNT):
+        def print_status():
+            for i in range(0,IFSTATE.NUM_STATES):
                 print monitor.get_raw_state_publisher(iface, i).get(),
                 print monitor.get_state_publisher(iface, i).get(), '  /  ',
             print
-            reactor.iterate(1)
+            reactor.callLater(1, print_status)
+        
+        print_status()
+        reactor.run()
     except KeyboardInterrupt:
         print "Shutting down on CTRL+C"
         #monitor.shutdown()
