@@ -4,11 +4,6 @@ import logging
 import logging.handlers
 import os
 from logging_config import *
-import fcntl
-import time
-import traceback
-import signal
-import select
 from twisted.internet import protocol, reactor
 
 class CommandWithOutput(protocol.ProcessProtocol):
@@ -28,7 +23,7 @@ class CommandWithOutput(protocol.ProcessProtocol):
         self.errline = ""
         self.shutting_down = False
         self.proc = None
-        reactor.addSystemEventTrigger('during', 'shutdown', self.shutdown)
+        self.shutdown_trigger = reactor.addSystemEventTrigger('during', 'shutdown', self.shutdown)
         reactor.callWhenRunning(self.start_proc)
                             
     def errReceived(self, data):
@@ -77,6 +72,10 @@ class CommandWithOutput(protocol.ProcessProtocol):
 
     def shutdown(self):
         self.shutting_down = True
+        try:
+            reactor.removeSystemEventTrigger(self.shutdown_trigger)
+        except ValueError:
+            pass # We may have been called automatically at shutdown.
         if self.proc:
             self.proc.signalProcess("INT")
 
