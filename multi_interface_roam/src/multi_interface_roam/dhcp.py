@@ -11,10 +11,19 @@ import event
 import random
 import time
 import traceback
+import ipaddr
+import state_publisher
+
+# FIXME Add support for multiple leases.
+# FIXME Actually make renew and rebind different.
+# FIXME Figure out why rebind doesn't work 10 seconds after first bind or
+# replug.
+# FIXME Add a way to signal x amount of time before we lose the lease.
 
 class DhcpLease:
     def __init__(self):
         self.timeout_time = {}
+        self.public_config = {}
 
 class DhcpData:
     def __init__(self, iface):
@@ -22,6 +31,7 @@ class DhcpData:
         self.socket = None
         self.link_addr_state = monitor.get_state_publisher(self.iface, IFSTATE.LINK_ADDR) 
         self.error_event = event.Event()
+        self.binding_publisher = state_publisher.StatePublisher(None)
         self.error_timeout = 5
         self.exp_backoff_min = 0.2
         self.exp_backoff_max = 0.5
@@ -71,7 +81,7 @@ class ExchangeRetryExponentialBackoff:
 
 class ExchangeRetryHalve:
     def init_timeouts(self, ud):
-        return ud.dhcp.lease.timeout_time[self.type]
+        return ud.dhcp.lease.timeout_time[self.type] - time.time()
 
     def get_next_retry(self, ud):
         return 60 + (ud.dhcp.lease.timeout_time[self.type] - time.time()) / 2
@@ -100,8 +110,16 @@ class ExchangeDiscover:
                 print "Ignoring packet based on unexpected message_type %s"%message_type
                 return False
                 
-            ud.dhcp.lease.ip = bootp.yiaddr
+            ip = ud.dhcp.lease.public_config['ip'] = bootp.yiaddr
             ud.dhcp.lease.server_ip = bootp.siaddr
+            ud.dhcp.lease.public_config['gateway'] = find_dhcp_option('router', "0.0.0.0", dhcp)[0]
+            netmask = ud.dhcp.lease.public_config['netmask'] = find_dhcp_option('subnet_mask', "0.0.0.0", dhcp)[0]
+            net = ipaddr.IPv4Network("%s/%s"%(ip, netmask))
+            ud.dhcp.lease.public_config['netmask_bits'] = net.prefixlen
+            ud.dhcp.lease.public_config['network'] = net.network
+            ud.dhcp.lease.public_config['ip_slashed'] = "%s/%i"%(ip, net.prefixlen)
+            ud.dhcp.lease.public_config['network_slashed'] = "%s/%i"%(net.network, net.prefixlen)
+
             # TODO do more stuff here?
             return 'success'
             
@@ -143,11 +161,14 @@ class ExchangeRequest:
             lease_time = lease_time[0] 
             renewal_time = find_dhcp_option('renewal_time', (random.uniform(0.45, 0.55) * lease_time, ), dhcp)[0]
             rebind_time = find_dhcp_option('rebinding_time', (random.uniform(0.825, 0.925) * lease_time, ), dhcp)[0]
+            #lease_time = 15
+            #rebind_time = 2
+            #renewal_time = 1
             ud.dhcp.lease.timeout_time['BOUND'] = renewal_time * 0.99 + self.send_time
             ud.dhcp.lease.timeout_time['RENEW'] = rebind_time * 0.99 + self.send_time
             ud.dhcp.lease.timeout_time['REBIND'] = lease_time * 0.99 + self.send_time
 
-            
+
             # FIXME Read other options here.
             return 'success'
 
@@ -161,9 +182,10 @@ class ExchangeRequest:
 class NoLink(DhcpState):
     def __init__(self):
         DhcpState.__init__(self, outcomes=['bound', 'init', 'init_reboot'])
- 
+
     @inlineCallbacks
     def execute_async(self, ud):
+        ud.dhcp.binding_publisher.set(None)
         ud.dhcp.hwaddr = yield async_helpers.wait_for_state(ud.dhcp.link_addr_state, False, True)
         network_id = "" # Include MAC, network_id
         if network_id not in ud.dhcp.leases:
@@ -191,7 +213,7 @@ class Exchange(DhcpState):
 
     def send(self, ud):
         hwbytes = scapy.mac2str(ud.dhcp.hwaddr)
-        
+
         # Prepare options
         options = [
                 ("message-type", self.message_type), 
@@ -204,7 +226,7 @@ class Exchange(DhcpState):
                     )
                 ]
         if self.type in ["REQUEST", "REBOOT", ]:
-            options.append(('requested_addr', ud.dhcp.lease.ip))
+            options.append(('requested_addr', ud.dhcp.lease.public_config['ip']))
         if self.type in ["REQUEST", ]:
             options.append(('server_id', ud.dhcp.lease.server_ip))
         options.append('end')
@@ -213,14 +235,14 @@ class Exchange(DhcpState):
         # Prepare BOOTP
         pkt = scapy.BOOTP(chaddr=[hwbytes], xid=ud.dhcp.lease.xid)/pkt
         if self.type in [ "RENEW", "REBIND", ]:
-            pkt.ciaddr = ud.dhcp.lease.ip 
+            pkt.ciaddr = ud.dhcp.lease.public_config['ip'] 
 
         # Prepare UDP/IP
         pkt = scapy.IP(src=IP_ZERO, dst=IP_BCAST)/scapy.UDP(sport=68, dport=67)/pkt
 
         # Prepare Ethernet
         pkt = scapy.Ether(src=ud.dhcp.hwaddr, dst=ETHER_BCAST)/pkt
-        print "Out:", repr(pkt)
+        print "Out:", repr(scapy.Ether(str(pkt)))
         ud.dhcp.socket.port.send(str(pkt))
                     
     def validate_common(self, ud, pkt, ip, udp, bootp, dhcp): 
@@ -231,7 +253,7 @@ class Exchange(DhcpState):
 
         # Does the xid match?
         if pkt.xid != ud.dhcp.lease.xid:
-            print "Discarding packet based on xid: %i != %i"%(pkt.xid, ud.dhcp.lease.xit)
+            print "Discarding packet based on xid: %i != %i"%(pkt.xid, ud.dhcp.lease.xid)
             return False
        
         # TODO Check that from right server?
@@ -302,6 +324,7 @@ class Error(DhcpState):
  
     @inlineCallbacks
     def execute_async(self, ud):
+        ud.dhcp.binding_publisher.set(None)
         ud.dhcp.error_event.trigger()
         ud.dhcp.socket.set_discard(True)
         events = yield async_helpers.select(
@@ -322,7 +345,7 @@ class Bound(DhcpState):
     @inlineCallbacks
     def execute_async(self, ud):
         ud.dhcp.socket.set_discard(True)
-        #FIXME Actually set the address
+        ud.dhcp.binding_publisher.set(ud.dhcp.lease.public_config)
         events = yield async_helpers.select(
             async_helpers.StateCondition(ud.dhcp.link_addr_state, False, False),
             async_helpers.Timeout(ud.dhcp.lease.timeout_time['BOUND'] - time.time()),
@@ -334,7 +357,7 @@ class Bound(DhcpState):
         returnValue('timeout')
 
 
-def start_dhcp(iface):
+def dhcp_client(iface):
     sm = smach.StateMachine(outcomes=[], input_keys=['dhcp'])
     smadd = smach.StateMachine.add
     with sm:
@@ -360,6 +383,7 @@ def start_dhcp(iface):
                 return None
         return error
     sm.execute_async(ud).addCallback(shutdown).addErrback(ignore_eintr)
+    return ud.dhcp
 
 if __name__ == "__main__":
     import sys
@@ -371,5 +395,5 @@ if __name__ == "__main__":
 
     iface = sys.argv[1]
 
-    start_dhcp(iface)
+    dhcp_client(iface)
     reactor.run()    

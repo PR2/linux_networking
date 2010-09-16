@@ -122,19 +122,22 @@ class NetlinkMonitor(command_with_output.CommandWithOutput):
 
 monitor = netlink_monitor = NetlinkMonitor()
 
-if __name__ == "__main__":
+def print_status(iface):
+    for i in range(0,IFSTATE.NUM_STATES):
+        print monitor.get_raw_state_publisher(iface, i).get(),
+        print monitor.get_state_publisher(iface, i).get(), '  /  ',
+    print
+    reactor.callLater(1, print_status, iface)
+
+def main():
     from twisted.internet import reactor
-    iface = 'lo'
+    iface = 'eth1'
     try:
-        def print_status():
-            for i in range(0,IFSTATE.NUM_STATES):
-                print monitor.get_raw_state_publisher(iface, i).get(),
-                print monitor.get_state_publisher(iface, i).get(), '  /  ',
-            print
-            reactor.callLater(1, print_status)
-        
-        print_status()
+        print_status(iface)
         reactor.run()
     except KeyboardInterrupt:
         print "Shutting down on CTRL+C"
         #monitor.shutdown()
+
+if __name__ == "__main__":
+    main()

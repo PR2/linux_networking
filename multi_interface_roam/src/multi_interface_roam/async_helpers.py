@@ -12,7 +12,7 @@ from event import Unsubscribe
 
 def async_sleep(t):
     d = Deferred()
-    reactor.callLater(t, d.callback, None)
+    reactor.callLater(max(0, t), d.callback, None)
     return d
 
 def event_queue(event):
@@ -101,7 +101,7 @@ def StateCondition(state, target, invert = False):
 class Timeout(EventStream):
     def __init__(self, timeout):
         EventStream.__init__(self)
-        h = reactor.callLater(timeout, self.put)
+        h = reactor.callLater(max(0, timeout), self.put)
         def cancel():
             if not h.called:
                 h.cancel()

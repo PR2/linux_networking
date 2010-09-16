@@ -74,8 +74,13 @@ class L2Port:
             return -1
 
     def doRead(self):
-        data = self._socket.recv(self._max_size)
-        self._protocol.dataReceived(data)
+        try:
+            data = self._socket.recv(self._max_size)
+        except socket.error, e:
+            if e.errno == 100:
+                pass # This happens if the interface goes down.
+        else:
+            self._protocol.dataReceived(data)
 
     def startListening(self):    
         self._reactor.addReader(self)

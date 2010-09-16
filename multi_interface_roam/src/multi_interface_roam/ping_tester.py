@@ -4,6 +4,7 @@ import roslib; roslib.load_manifest('multi_interface_roam')
 from state_publisher import StatePublisher
 import network_monitor_udp.udpmoncli as udpmoncli
 from netlink_monitor import IFSTATE, netlink_monitor
+from twisted.internet import reactor
 
 state_publishers = {}
 
@@ -15,6 +16,7 @@ def get_state_publisher(iface):
 class PingTester:
     def __init__(self, iface, rate, pingtarget):
         self.state_publisher = get_state_publisher(iface)
+        reactor.addSystemEventTrigger('during', 'shutdown', self._shutdown)
         self.udp_monitor = udpmoncli.MonitorClient([.2], pingtarget, rate, 32, True)
         netlink_monitor.get_state_publisher(iface, IFSTATE.ADDR).subscribe(self._addr_cb)
 
@@ -29,3 +31,10 @@ class PingTester:
         else:
             self.udp_monitor.stop_monitor()
             self.state_publisher.set(None)
+
+    def _shutdown(self):
+        try:
+            self.udp_monitor.shutdown()
+        except:
+            import sys
+            sys.print_exc()

@@ -9,7 +9,7 @@ from state_publisher import CompositeStatePublisher
 class InterfaceUpper:
     def __init__(self, iface):
         self.iface = iface
-        self.pub = CompositeStatePublisher(lambda x: x, [
+        CompositeStatePublisher(lambda x: x, [
             netlink_monitor.get_state_publisher(iface, IFSTATE.PLUGGED),
             netlink_monitor.get_state_publisher(iface, IFSTATE.UP),
         ]).subscribe(self._cb)

@@ -7,6 +7,7 @@ from logging_config import *
 from twisted.internet import protocol, reactor
 from twisted.internet.defer import Deferred, inlineCallbacks
 import sys
+import command_with_output # There is a SIGCHLD hack in there that we want to run
 
 class System(protocol.ProcessProtocol):
     def __init__(self, *args):
@@ -30,7 +31,13 @@ class System(protocol.ProcessProtocol):
             self.proc.signalProcess("INT")
 
 def system(*args):
+    #import time
+    #print time.time(), "system: ", args
+    print "system: ", args
     s = System(*args)
+    #def printout(value):
+    #    print time.time(), "system done: ", args
+    #s.deferred.addCallback(printout)
     return s.deferred
 
 if __name__ == "__main__":
