@@ -201,6 +201,7 @@ class Init(DhcpState):
         DhcpState.__init__(self, outcomes=['done', 'nolink'])
 
     def execute_async(self, ud):
+        ud.dhcp.binding_publisher.set(None)
         ud.dhcp.start_socket()
         return 'done'
 
