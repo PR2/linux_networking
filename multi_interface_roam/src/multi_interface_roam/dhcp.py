@@ -111,7 +111,7 @@ class ExchangeDiscover:
                 return False
                 
             ip = ud.dhcp.lease.public_config['ip'] = bootp.yiaddr
-            ud.dhcp.lease.server_ip = bootp.siaddr
+            ud.dhcp.lease.server_ip = find_dhcp_option('server_id', "0.0.0.0", dhcp)[0]
             ud.dhcp.lease.public_config['gateway'] = find_dhcp_option('router', "0.0.0.0", dhcp)[0]
             netmask = ud.dhcp.lease.public_config['netmask'] = find_dhcp_option('subnet_mask', "0.0.0.0", dhcp)[0]
             net = ipaddr.IPv4Network("%s/%s"%(ip, netmask))
@@ -161,7 +161,7 @@ class ExchangeRequest:
             lease_time = lease_time[0] 
             renewal_time = find_dhcp_option('renewal_time', (random.uniform(0.45, 0.55) * lease_time, ), dhcp)[0]
             rebind_time = find_dhcp_option('rebinding_time', (random.uniform(0.825, 0.925) * lease_time, ), dhcp)[0]
-            #lease_time = 15
+            #lease_time = 10
             #rebind_time = 2
             #renewal_time = 1
             ud.dhcp.lease.timeout_time['BOUND'] = renewal_time * 0.99 + self.send_time
@@ -238,7 +238,10 @@ class Exchange(DhcpState):
             pkt.ciaddr = ud.dhcp.lease.public_config['ip'] 
 
         # Prepare UDP/IP
-        pkt = scapy.IP(src=IP_ZERO, dst=IP_BCAST)/scapy.UDP(sport=68, dport=67)/pkt
+        pkt = scapy.IP(src=pkt.ciaddr, dst=IP_BCAST)/scapy.UDP(sport=68, dport=67)/pkt
+        if self.type in [ "RENEW" ]:
+            pkt.dst = ud.dhcp.lease.server_ip
+            # FIXME Do arp here?
 
         # Prepare Ethernet
         pkt = scapy.Ether(src=ud.dhcp.hwaddr, dst=ETHER_BCAST)/pkt
