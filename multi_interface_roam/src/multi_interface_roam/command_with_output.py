@@ -5,6 +5,18 @@ import logging.handlers
 import os
 from logging_config import *
 from twisted.internet import protocol, reactor
+import signal
+
+# This is a workaround for older versions of twisted that use SIGCHLD, but
+# do not set SA_RESTART.
+def sa_restart_hack():
+    import twisted.internet.base
+    old_handleSignals = twisted.internet.base._SignalReactorMixin._handleSignals
+    def _handleSignals(self):
+        old_handleSignals(self)
+        signal.siginterrupt(signal.SIGCHLD, False)
+    twisted.internet.base._SignalReactorMixin._handleSignals = _handleSignals
+sa_restart_hack()
 
 class CommandWithOutput(protocol.ProcessProtocol):
     def __init__(self, args, name):
