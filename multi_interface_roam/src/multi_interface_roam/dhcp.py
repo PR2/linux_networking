@@ -112,6 +112,7 @@ class ExchangeDiscover:
                 
             ip = ud.dhcp.lease.public_config['ip'] = bootp.yiaddr
             ud.dhcp.lease.server_ip = find_dhcp_option('server_id', "0.0.0.0", dhcp)[0]
+            ud.dhcp.lease.server_mac = pkt.src
             ud.dhcp.lease.public_config['gateway'] = find_dhcp_option('router', "0.0.0.0", dhcp)[0]
             netmask = ud.dhcp.lease.public_config['netmask'] = find_dhcp_option('subnet_mask', "0.0.0.0", dhcp)[0]
             net = ipaddr.IPv4Network("%s/%s"%(ip, netmask))
@@ -241,10 +242,11 @@ class Exchange(DhcpState):
         pkt = scapy.IP(src=pkt.ciaddr, dst=IP_BCAST)/scapy.UDP(sport=68, dport=67)/pkt
         if self.type in [ "RENEW" ]:
             pkt.dst = ud.dhcp.lease.server_ip
-            # FIXME Do arp here?
 
         # Prepare Ethernet
         pkt = scapy.Ether(src=ud.dhcp.hwaddr, dst=ETHER_BCAST)/pkt
+        if self.type in [ "RENEW" ]:
+            pkt.dst = ud.dhcp.lease.server_mac
         print "Out:", repr(scapy.Ether(str(pkt)))
         ud.dhcp.socket.port.send(str(pkt))
                     
