@@ -719,26 +719,26 @@ void ros_add_iface(wpa_supplicant *wpa_s)
 {
   ROS_INFO("ros_add_iface");
   wpa_s->ros_api = new ros_interface(ros::NodeHandle(), wpa_s);
-  ROS_INFO("wpa_s in ros_add_iface: %p", wpa_s);
-  ROS_INFO("wpa_s.ros in ros_add_iface: %p", wpa_s->ros_api);
 }
 
 void ros_remove_iface(wpa_supplicant *wpa_s)
 {
   ROS_INFO("ros_remove_iface");
-  delete wpa_s->ros_api;
+  if (wpa_s->ros_api)
+    delete wpa_s->ros_api;
 }
 
 void ros_iface_idle(wpa_supplicant *wpa_s)
 {
-  wpa_s->ros_api->ifaceIdle();
+  if (wpa_s->ros_api)
+    wpa_s->ros_api->ifaceIdle();
 }
   
 void ros_scan_completed(wpa_supplicant *wpa_s, wpa_scan_results *scan_res)
 {
   ROS_INFO("wpa_s in ros_scan_completed: %p", wpa_s);
-  ROS_INFO("wpa_s.ros in ros_scan_completed: %p", wpa_s->ros_api);
-  wpa_s->ros_api->scanCompleted(scan_res);
+  if (wpa_s->ros_api)
+    wpa_s->ros_api->scanCompleted(scan_res);
 }
 
 void ros_do_work(int, void *, void *)
@@ -748,12 +748,14 @@ void ros_do_work(int, void *, void *)
 
 void ros_assoc_failed(wpa_supplicant *wpa_s, const u8 *bssid, const char *reason)
 {
-  wpa_s->ros_api->assocFailed(bssid, reason);
+  if (wpa_s->ros_api)
+    wpa_s->ros_api->assocFailed(bssid, reason);
 }
 
 void ros_assoc_success(wpa_supplicant *wpa_s, const u8 *bssid)
 {
-  wpa_s->ros_api->assocSucceeded(bssid);
+  if (wpa_s->ros_api)
+    wpa_s->ros_api->assocSucceeded(bssid);
 }
 
 } // extern "C"

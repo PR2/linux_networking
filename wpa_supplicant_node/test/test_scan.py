@@ -101,7 +101,7 @@ if __name__ == '__main__':
             #    result = t.scan([], [2437])
             #result = t.scan([], [])
             #result = t.scan([], [5260, 5805])
-            result = t.scan([], [5260, 5805, 2437])
+            result = t.scan([], [5240, 5260, 5805, 2437])
             #if count > 1:
             print len(result.bss)
             #    rospy.sleep(rospy.Duration(0.5))
@@ -123,7 +123,7 @@ if __name__ == '__main__':
                       #"00:24:6C:81:4E:FA", # willow-wpa2
                       #"00:24:6C:81:D5:E0", # willow
                       #"00:24:6C:81:D5:EA", # willow-wpa2
-                      #"00:24:6C:81:D5:E8", # willow blaise-office
+                      "00:24:6C:81:D5:E8", # willow blaise-office
                       "00:24:6C:82:4E:F8", # willow lab
                       ]
                     essidlist = [
