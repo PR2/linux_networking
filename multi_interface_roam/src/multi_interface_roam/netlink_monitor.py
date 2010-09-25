@@ -5,6 +5,7 @@ import state_publisher
 import threading
 import time
 import traceback
+import pythonwifi.iwlibs
 
 # TODO 
 # Make this autoshutdown when there are no references.
@@ -95,7 +96,17 @@ class NetlinkMonitor(command_with_output.CommandWithOutput):
                     try:
                         state_idx = tokens.index('state')
                         state = tokens[state_idx + 1]
-                        self.get_raw_state_publisher(self.cur_iface, IFSTATE.LINK).set(state != 'DOWN')
+                        if state != 'DOWN':
+                            try:
+                                link_state = pythonwifi.iwlibs.Wireless(self.cur_iface).getAPaddr()
+                            except IOError, e:
+                                if e.errno == 95:
+                                    link_state = 'Wired'
+                                else:
+                                    raise
+                        else:
+                            link_state = False
+                        self.get_raw_state_publisher(self.cur_iface, IFSTATE.LINK).set(link_state)
                     except ValueError:
                         pass # Sometimes state is not listed.
                 
@@ -123,6 +134,7 @@ class NetlinkMonitor(command_with_output.CommandWithOutput):
 monitor = netlink_monitor = NetlinkMonitor()
 
 def print_status(iface):
+    from twisted.internet import reactor
     for i in range(0,IFSTATE.NUM_STATES):
         print monitor.get_raw_state_publisher(iface, i).get(),
         print monitor.get_state_publisher(iface, i).get(), '  /  ',

@@ -26,6 +26,7 @@ rosbuild_add_pyunit(src/multi_interface_roam/state_publisher.py)
 rosbuild_add_pyunit(src/multi_interface_roam/async_helpers.py)
 rosbuild_add_pyunit(src/multi_interface_roam/command_with_output.py)
 rosbuild_add_pyunit(src/multi_interface_roam/system.py)
+rosbuild_add_pyunit(src/multi_interface_roam/mac_addr.py)
 
 rosbuild_find_ros_package(dynamic_reconfigure)
 include(${dynamic_reconfigure_PACKAGE_PATH}/cmake/cfgbuild.cmake)

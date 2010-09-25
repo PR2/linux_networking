@@ -69,6 +69,9 @@ class _EventDispatcher:
                 cb(*allargs, **allkwargs)
             except Unsubscribe:
                 repeating = False
+            except:
+                import traceback
+                traceback.print_exc()
             if not repeating:
                 del self._subscribers[h]
                 h._auto_unsubscribed = True

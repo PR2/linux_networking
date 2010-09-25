@@ -50,7 +50,7 @@ class CompositeStatePublisher(StatePublisher):
         self._states = n * [ JustSubscribed ]
         self._has_been_set = n * [ False ]
         for i in range(0, n):
-           state_publishers[i].subscribe(self._cb, i) 
+            state_publishers[i].subscribe(self._cb, i) 
    
     _set = StatePublisher.set
 

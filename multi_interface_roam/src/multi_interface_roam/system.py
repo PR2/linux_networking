@@ -68,6 +68,7 @@ if __name__ == "__main__":
             self.assertTrue(duration >= 1, "%s > 1 is false"%duration)
 
     def run_ros_tests():
+        import rostest
         rostest.unitrun('multi_interface_roam', 'system', SystemTest)
     
     unittest_with_reactor(run_ros_tests)

@@ -165,6 +165,7 @@ if __name__ == "__main__":
         
 
     def run_ros_tests():
+        import rostest
         rostest.unitrun('multi_interface_roam', 'command_with_output', CommandWithOutputTest)
     
     unittest_with_reactor(run_ros_tests)

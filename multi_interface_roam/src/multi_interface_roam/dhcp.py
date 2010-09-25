@@ -15,9 +15,6 @@ import ipaddr
 import state_publisher
 
 # FIXME Add support for multiple leases.
-# FIXME Actually make renew and rebind different.
-# FIXME Figure out why rebind doesn't work 10 seconds after first bind or
-# replug.
 # FIXME Add a way to signal x amount of time before we lose the lease.
 
 class DhcpLease:
@@ -248,7 +245,7 @@ class Exchange(DhcpState):
         pkt = scapy.Ether(src=ud.dhcp.hwaddr, dst=ETHER_BCAST)/pkt
         if self.type in [ "RENEW" ]:
             pkt.dst = ud.dhcp.lease.server_mac
-        print "Out:", repr(scapy.Ether(str(pkt)))
+        #print "Out:", repr(scapy.Ether(str(pkt)))
         ud.dhcp.socket.port.send(str(pkt))
                     
     def validate_common(self, ud, pkt, ip, udp, bootp, dhcp): 
@@ -302,7 +299,7 @@ class Exchange(DhcpState):
     
                 if 1 in events: # Got packet
                     pkt = scapy.Ether(ud.dhcp.socket.recv())
-                    print "In:", repr(pkt)
+                    #print "In:", repr(pkt)
 
                     result = self.validate(ud, pkt)
                     if result:
