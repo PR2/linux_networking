@@ -100,7 +100,8 @@ class MonitorClient:
                     time.sleep(sleeptime)
                 if self.paused:
                     with self.cv:
-                        self.cv.wait()
+                        if not self.exiting:
+                            self.cv.wait()
                     next_time = time.time()
                     continue
                 seqnum = seqnum + 1
@@ -125,7 +126,8 @@ class MonitorClient:
         while not self.exiting:
             if self.paused:
                 with self.cv:
-                    self.cv.wait()
+                    if not self.exiting:
+                        self.cv.wait()
                 next_time = time.time()
                 continue
             try:
