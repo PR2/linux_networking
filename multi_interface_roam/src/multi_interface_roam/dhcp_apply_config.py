@@ -27,9 +27,11 @@ class _DhcpSetterCommon:
         finally:
             self._lock.release()
     
+    @inlineCallbacks
     def _shutdown(self):
+        print "Shutdown", self
+        yield self._cb(None, None)
         self.is_shutdown = True
-        self._cb(None, None)
 
 class DhcpAddressSetter(_DhcpSetterCommon):
     def __init__(self, iface, state_pub):
@@ -61,7 +63,7 @@ class DhcpRouteSetter(_DhcpSetterCommon):
 
     @inlineCallbacks
     def _locked_cb(self, old_state, new_state):
-        yield system.system('ip', 'route', 'flush', 'dev', self.iface)
+        yield system.system('ip', 'route', 'flush', 'table', self.table, 'dev', self.iface)
 
         if new_state:
             gateway = new_state['gateway']

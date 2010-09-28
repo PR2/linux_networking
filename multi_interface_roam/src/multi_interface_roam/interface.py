@@ -5,19 +5,32 @@ import ping_tester
 import dhcp
 from dhcp_apply_config import DhcpAddressSetter, DhcpRouteSetter, DhcpSourceRuleSetter
 import config
+from netlink_monitor import netlink_monitor
 
 class Interface:
-    def __init__(self, iface, tableid):
+    def __init__(self, iface, tableid, name):
         self.iface = iface
+        self.name = name
+        self.priority = config.get_interface_parameter(iface, 'priority', 0)
         src_rule_setter = DhcpSourceRuleSetter(iface, tableid, tableid)
-        self.ping_tester = ping_tester.PingTester(iface, 20, ('prbase7', 1194), src_rule_setter.state_pub)
+        self.tableid = str(tableid)
+        base_station = config.get_parameter('base_station')
+        ping_port = config.get_parameter('ping_port')
+        self.ping_tester = ping_tester.PingTester(iface, 20, (base_station, ping_port), src_rule_setter.state_pub)
 
-    def periodic_update(self, interval):
-        self.ping_tester.update()
+    def update(self, interval):
+        (bins, latency1, latency2) = self.ping_tester.update(interval)
+        
+        self.status = netlink_monitor.get_status_publisher(self.name).get()
+        if self.status < 0:
+            self.goodness = self.status
+            self.reliability = self.status
+        else:
+            self.goodness = 100 * bins[0] - latency2 # Goodness is how many packets made it through then average latency.
 
 class DhcpInterface(Interface):
     def __init__(self, iface, tableid):
-        Interface.__init__(self, iface, tableid)
+        Interface.__init__(self, iface, tableid, iface)
         interface_upper.InterfaceUpper(iface)
         dhcpdata = dhcp.dhcp_client(iface)
         DhcpAddressSetter(iface, dhcpdata.binding_publisher)
@@ -26,6 +39,14 @@ class DhcpInterface(Interface):
         # FIXME RPFilter somewhere.
         # Flush ip rule on interface up somewhere.
         # Set ip rule for ping somewhere.
+
+class WiredInterface(DhcpInterface):
+    def __init__(self, iface, tableid):
+        DhcpInterface.__init__(self, iface, tableid)
+
+    def update(self, interval):
+        self.reliability = 100
+        DhcpInterface.update(self, interval)
 
 class WirelessInterface(DhcpInterface):
     def __init__(self, iface, tableid):
@@ -41,7 +62,7 @@ def construct(iface, tableid):
     try:
         type = config.get_interface_parameter(iface, 'type')
         if type == "wired":
-            return DhcpInterface(iface, tableid)
+            return WiredInterface(iface, tableid)
         if type == "wireless":
             return WirelessInterface(iface, tableid)
         if type == "static":

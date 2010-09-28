@@ -9,35 +9,76 @@ from twisted.internet.defer import Deferred, inlineCallbacks
 import sys
 import command_with_output # There is a SIGCHLD hack in there that we want to run
 
+class Quiet:
+    pass
+
+class AutoShutdown:
+    pass
+
 class System(protocol.ProcessProtocol):
     def __init__(self, *args):
         self.deferred = Deferred()
+        self.quiet = False
+        autoshutdown = False
+        while True:
+            if args[0] == Quiet:
+                self.quiet = True
+            elif args[0] == AutoShutdown:
+                autoshutdown = True
+            else:
+                break
+            args = args[1:]
         self.proc = None
-        self.shutdown_trigger = reactor.addSystemEventTrigger('during', 'shutdown', self.shutdown)
+        self.args = args
+        self.shutdown_deferreds = []
+        if autoshutdown:
+            self.shutdown_trigger = reactor.addSystemEventTrigger('before', 'shutdown', self._shutdown)
+        else:
+            self.shutdown_trigger = None
         self.proc = reactor.spawnProcess(self, args[0], args, None)
     
     def errReceived(self, data):
-        print >> sys.stderr, data
+        if not self.quiet:
+            print >> sys.stderr, data
 
     def outReceived(self, data):
-        print >> sys.stdout, data
+        if not self.quiet:
+            print >> sys.stdout, data
 
     def processEnded(self, status_object):
-        reactor.removeSystemEventTrigger(self.shutdown_trigger)
+        if self.shutdown_trigger:
+            reactor.removeSystemEventTrigger(self.shutdown_trigger)
+            self.shutdown_trigger = None
         self.deferred.callback(status_object.value.exitCode)
+        for d in self.shutdown_deferreds:
+            d.callback(status_object.value.exitCode)
+
+    def _shutdown(self):
+        """Called at system shutdown."""
+        self.shutdown_trigger = None
+        return self.shutdown()
 
     def shutdown(self):
+        """Call this to interrupt the program. Returns a deferred that will
+        be called when shutdown is complete."""
+        d = Deferred()
+        self.shutdown_deferreds.append(d)
         if self.proc:
+            print "Killing command:", self.args
             self.proc.signalProcess("INT")
+        else:
+            d.callback()
+        return d
 
 def system(*args):
-    #import time
-    #print time.time(), "system: ", args
-    print "system: ", args
+    import time
+    print time.time(), "system: ", args
+    #print "system: ", args
     s = System(*args)
-    #def printout(value):
-    #    print time.time(), "system done: ", args
-    #s.deferred.addCallback(printout)
+    def printout(value):
+        print time.time(), "system done: ", args
+        return value
+    s.deferred.addCallback(printout)
     return s.deferred
 
 if __name__ == "__main__":

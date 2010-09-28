@@ -30,6 +30,7 @@ class NetlinkMonitor(command_with_output.CommandWithOutput):
         self.lock = threading.RLock()
         self.raw_state_publishers = [ {} for i in range(0, IFSTATE.NUM_STATES)]
         self.state_publishers = [ {} for i in range(0, IFSTATE.NUM_STATES)]
+        self.status_publishers = {}
         self.cur_iface = None
         self.deleted = None
         command_with_output.CommandWithOutput.__init__(self, ['ip', 'monitor', 'link', 'addr'], 'ip_monitor')
@@ -62,6 +63,21 @@ class NetlinkMonitor(command_with_output.CommandWithOutput):
             pubs[interface] = state_publisher.StatePublisher(False)
         return pubs[interface]
      
+    def get_status_publisher(self, interface):
+        if not interface in self.status_publishers:
+            def lowest_nonzero(args):
+                best = -1
+                for arg in args:
+                    if not arg:
+                        break
+                    else:
+                        best += 1
+                print args, best
+                return best
+            raw_pubs = [ self.get_raw_state_publisher(interface, level) for level in range(IFSTATE.NUM_STATES) ]
+            self.status_publishers[interface] = state_publisher.CompositeStatePublisher(lowest_nonzero, raw_pubs)
+        return self.status_publishers[interface]
+
     def got_line(self, line):
         with self.lock:
             try:
@@ -135,6 +151,7 @@ monitor = netlink_monitor = NetlinkMonitor()
 
 def print_status(iface):
     from twisted.internet import reactor
+    print monitor.get_status_publisher(iface).get(), ' : ',
     for i in range(0,IFSTATE.NUM_STATES):
         print monitor.get_raw_state_publisher(iface, i).get(),
         print monitor.get_state_publisher(iface, i).get(), '  /  ',

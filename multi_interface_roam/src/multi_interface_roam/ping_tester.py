@@ -25,6 +25,7 @@ class PingTester:
 
     def update(self, update_rate):
         self.state_publisher.set(self.udp_monitor.get_smart_bins(update_rate))
+        return self.state_publisher.get()
 
     def _addr_cb(self, old_state, new_state):
         if new_state:
