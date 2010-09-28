@@ -717,15 +717,13 @@ void ros_deinit()
 
 void ros_add_iface(wpa_supplicant *wpa_s)
 {
-  ROS_INFO("ros_add_iface");
   wpa_s->ros_api = new ros_interface(ros::NodeHandle(), wpa_s);
 }
 
 void ros_remove_iface(wpa_supplicant *wpa_s)
 {
-  ROS_INFO("ros_remove_iface");
-  if (wpa_s->ros_api)
-    delete wpa_s->ros_api;
+  delete wpa_s->ros_api;
+  wpa_s->ros_api = NULL;
 }
 
 void ros_iface_idle(wpa_supplicant *wpa_s)
@@ -736,7 +734,6 @@ void ros_iface_idle(wpa_supplicant *wpa_s)
   
 void ros_scan_completed(wpa_supplicant *wpa_s, wpa_scan_results *scan_res)
 {
-  ROS_INFO("wpa_s in ros_scan_completed: %p", wpa_s);
   if (wpa_s->ros_api)
     wpa_s->ros_api->scanCompleted(scan_res);
 }
