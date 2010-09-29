@@ -74,12 +74,13 @@ class InterfaceSelector:
         for tir in self.tun_ip_rules[len(selected_interfaces):]:
             yield tir.set()
     
-    TERRIBLE_INTERFACE = -1e20
+    TERRIBLE_INTERFACE = -1e1000
 
     @staticmethod
     def score_interface(iface):
         if iface.goodness <= 0:
             iface.score = InterfaceSelector.TERRIBLE_INTERFACE
+            return
 
         iface.score = iface.goodness + iface.reliability + iface.priority
 

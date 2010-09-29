@@ -3,6 +3,9 @@ import roslib; roslib.load_manifest("multi_interface_roam")
 import rospy
 import wpa_msg as wpa_msgs
 import actionlib                       
+import state_publisher
+import event
+from twisted.internet.reactor import reactor
 
 class Network:
     def __init__(id, enabled, parameters):
@@ -13,24 +16,26 @@ class Network:
             parameters = dict((p.key, p.value) for p in parameters)
         self.parameters = parameters
 
+class AssociationState:
+    def __nonzero__():
+        return False
+
+Associating = AssociationState()
+Unassociated = AssociationState()
+
 class Radio:
-    def __init__(interface_name, associate_callback = None, unassociate_callback = None, 
-            frequency_list_callback = None, network_list_callback = None,
-            scan_callback = None, scan_done_callback = None):
+    def __init__(interface_name)
         self.interface_name = interface_name
-        self.associate_callback = associate_callback
-        self.unassociate_callback = unassociate_callback
-        self.frequency_list_callback = frequency_list_callback
-        self.network_list_callback = network_list_callback
-        self.scan_callback = scan_callback
-        self.scan_done_callback = scan_done_callback
+        self.associated = state_publisher.StatePublisher(False)
+        self.frequency_list = state_publisher.StatePublisher([])
+        self.network_list = state_publisher.StatePublisher([])
+        self.scan_event = event.Event()
+        self.scanning_done_event = event.Event()
 
         self.networks = []
         self.hidden_networks = []
-        self.frequencies = []
         self.raw_scan_results = []
         self.scan_results = []
-        self.association = None
 
         prefix = rospy.resolve_name("wpa_supplicant")+"/"+interface_name+"/"
         rospy.Subscriber(prefix + "association_state", wpa_msgs.AssociateFeedback, _association_state_callback)
@@ -57,23 +62,22 @@ class Radio:
 
     def associate(ssid, bssid):
         _associate_action.send_goal(wpa_msg.AssociateGoal(ssid, bssid))
+        self.associated.set(Associating)
 
     def unassociate():
         _associate_action.cancel_all_goals()
 
     ## @brief Called when all the scans we have initiated are done.
     def _scan_done_callback(self, rslt):
-        if self.scan_done_callback:
-            self.scan_done_callback()
+        self.scanning_done_event.trigger()
 
     def _frequency_list_callback(self, msg):
-        self.frequencies = msg.frequencies
-        if self.frequency_list_callback:
-            self.frequency_list_callback(self)
+        self.frequency_list(msg)
 
     def _network_list_callback(self, msg):
         self.networks = [ Network(net.network_id, net.enabled, net.parameters) for net in msg.networks ]
         self.hidden_networks = [ net for net in self.networks if net.parameters['scan_ssid'] == '1' ]
+        self.network_list_callback.trigger()
         if self.network_list_callback:
             self.network_list_callback(self)
         self._filter_raw_scan_results() # The filtered scan results are out of date.
@@ -88,8 +92,7 @@ class Radio:
 
     def _filter_raw_scan_results(self, msg)
         self.scan_results = [ bss for bss in self.raw_scan_results if enabled_bss(bss) ]
-        if self.scan_callback:
-            self.scan_callback(self)
+        self.scan_event.trigger(self.scan_results)
     
     def _scan_results_callback(self, msg):
         self.raw_scan_results = msg.bss
@@ -97,10 +100,6 @@ class Radio:
 
     def _associate_state_callback(self, msg):
         if msg.associated:
-            self.association = msg.bss
-            if self.associate_callback:
-                self.associate_callback(self)
+            self.associated.set(msg.bss)
         else:
-            self.association = None
-            if self.unassociate_callback:
-                self.unassociate_callback(self)
+            self.associated.set(self.Unassociated)

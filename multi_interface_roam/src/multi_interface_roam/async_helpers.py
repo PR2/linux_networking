@@ -28,10 +28,10 @@ def now():
     reactor.callLater(0, d.callback, None)
     return d
 
-def wait_for_state(state, target, invert = False):
+def wait_for_state(state, condition):
     d = Deferred()
     def cb(old_state, new_state):
-        if (new_state == target) != invert:
+        if condition(new_state):
             d.callback(new_state)
             raise Unsubscribe
     state.subscribe(cb)
@@ -95,8 +95,8 @@ class EventStreamFromDeferred(EventStream):
         self.deferred = d
         d.addCallback(self.put)
 
-def StateCondition(state, target, invert = False):
-    return EventStreamFromDeferred(wait_for_state(state, target, invert))
+def StateCondition(*args, **kwargs):
+    return EventStreamFromDeferred(wait_for_state(*args, **kwargs))
 
 class Timeout(EventStream):
     def __init__(self, timeout):

@@ -72,7 +72,6 @@ class NetlinkMonitor(command_with_output.CommandWithOutput):
                         break
                     else:
                         best += 1
-                print args, best
                 return best
             raw_pubs = [ self.get_raw_state_publisher(interface, level) for level in range(IFSTATE.NUM_STATES) ]
             self.status_publishers[interface] = state_publisher.CompositeStatePublisher(lowest_nonzero, raw_pubs)

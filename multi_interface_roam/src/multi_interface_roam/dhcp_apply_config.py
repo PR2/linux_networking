@@ -29,7 +29,7 @@ class _DhcpSetterCommon:
     
     @inlineCallbacks
     def _shutdown(self):
-        print "Shutdown", self
+        #print "Shutdown", self
         yield self._cb(None, None)
         self.is_shutdown = True
 
@@ -37,13 +37,15 @@ class DhcpAddressSetter(_DhcpSetterCommon):
     def __init__(self, iface, state_pub):
         _DhcpSetterCommon.__init__(self)
         self.iface = iface
+        self._iface_status_pub = netlink_monitor.get_status_publisher(iface)
         state_pub.subscribe(self._cb)
 
     @inlineCallbacks
     def _locked_cb(self, old_state, new_state):
         #print "Address", new_state
         if new_state is None or old_state is not None:
-            yield system.system('ifconfig', self.iface, '0.0.0.0')
+            if self._iface_status_pub.get() >= IFSTATE.PLUGGED:
+                yield system.system('ifconfig', self.iface, '0.0.0.0')
 
         if new_state is not None:
             ip = new_state['ip']
@@ -56,6 +58,7 @@ class DhcpRouteSetter(_DhcpSetterCommon):
         _DhcpSetterCommon.__init__(self)
         self.iface = iface
         self.table = str(table)
+        self._iface_status_pub = netlink_monitor.get_status_publisher(iface)
         CompositeStatePublisher(lambda (addr, dhcp): None if not addr else dhcp, [
             netlink_monitor.get_state_publisher(iface, IFSTATE.ADDR),
             state_pub
@@ -63,7 +66,8 @@ class DhcpRouteSetter(_DhcpSetterCommon):
 
     @inlineCallbacks
     def _locked_cb(self, old_state, new_state):
-        yield system.system('ip', 'route', 'flush', 'table', self.table, 'dev', self.iface)
+        if self._iface_status_pub.get() >= IFSTATE.PLUGGED:
+            yield system.system('ip', 'route', 'flush', 'table', self.table, 'dev', self.iface)
 
         if new_state:
             gateway = new_state['gateway']

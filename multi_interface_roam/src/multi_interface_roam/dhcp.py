@@ -184,7 +184,7 @@ class NoLink(DhcpState):
     @inlineCallbacks
     def execute_async(self, ud):
         ud.dhcp.binding_publisher.set(None)
-        ud.dhcp.hwaddr = yield async_helpers.wait_for_state(ud.dhcp.link_addr_state, False, True)
+        ud.dhcp.hwaddr = yield async_helpers.wait_for_state(ud.dhcp.link_addr_state, lambda x: x != False)
         network_id = "" # Include MAC, network_id
         if network_id not in ud.dhcp.leases:
             ud.dhcp.leases[network_id] = DhcpLease()
@@ -289,7 +289,7 @@ class Exchange(DhcpState):
             while True:
                 # Wait for an event
                 events = yield async_helpers.select(
-                        async_helpers.StateCondition(ud.dhcp.link_addr_state, False, False), 
+                        async_helpers.StateCondition(ud.dhcp.link_addr_state, lambda x: x == False), 
                         ud.dhcp.socket, 
                         async_helpers.Timeout(interval),
                         timeout)
@@ -331,7 +331,7 @@ class Error(DhcpState):
         ud.dhcp.error_event.trigger()
         ud.dhcp.socket.set_discard(True)
         events = yield async_helpers.select(
-                async_helpers.StateCondition(ud.dhcp.link_addr_state, False, False),
+                async_helpers.StateCondition(ud.dhcp.link_addr_state, lambda x: x == False),
                 async_helpers.Timeout(ud.dhcp.error_timeout)
                 )
 
@@ -350,7 +350,7 @@ class Bound(DhcpState):
         ud.dhcp.socket.set_discard(True)
         ud.dhcp.binding_publisher.set(ud.dhcp.lease.public_config)
         events = yield async_helpers.select(
-            async_helpers.StateCondition(ud.dhcp.link_addr_state, False, False),
+            async_helpers.StateCondition(ud.dhcp.link_addr_state, lambda x: x == False),
             async_helpers.Timeout(ud.dhcp.lease.timeout_time['BOUND'] - time.time()),
             )
 
@@ -377,15 +377,15 @@ def dhcp_client(iface):
 
     ud = smach.UserData()
     ud.dhcp = DhcpData(iface)
-    def shutdown(value):
-        reactor.fireSystemEvent('shutdown')
-    def ignore_eintr(error):
-        if error.type == IOError:
-            import errno
-            if error.value.errno == errno.EINTR:
-                return None
-        return error
-    sm.execute_async(ud).addCallback(shutdown).addErrback(ignore_eintr)
+#    def shutdown(value):
+#        reactor.fireSystemEvent('shutdown')
+#    def ignore_eintr(error):
+#        if error.type == IOError:
+#            import errno
+#            if error.value.errno == errno.EINTR:
+#                return None
+#        return error
+    sm.execute_async(ud)#.addCallback(shutdown).addErrback(ignore_eintr)
     return ud.dhcp
 
 if __name__ == "__main__":

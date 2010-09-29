@@ -71,14 +71,17 @@ class System(protocol.ProcessProtocol):
         return d
 
 def system(*args):
-    import time
-    print time.time(), "system: ", args
+    debug = False
+    if debug:
+        import time
+        print time.time(), "system: ", args
     #print "system: ", args
     s = System(*args)
-    def printout(value):
-        print time.time(), "system done: ", args
-        return value
-    s.deferred.addCallback(printout)
+    if debug:
+        def printout(value):
+            print time.time(), "system done: ", args
+            return value
+        s.deferred.addCallback(printout)
     return s.deferred
 
 if __name__ == "__main__":
