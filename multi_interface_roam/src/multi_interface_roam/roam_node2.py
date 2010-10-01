@@ -10,6 +10,10 @@ import mac_addr
 import interface_selector
 import sys
 
+# FIXME May want to kill this at some point
+import asmach as smach
+smach.logdebug = lambda x: None
+
 class Node:
     def __init__(self, *args, **kwargs):
         rospy.init_node(*args, **kwargs)

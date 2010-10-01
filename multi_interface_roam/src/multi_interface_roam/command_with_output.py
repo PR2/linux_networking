@@ -7,6 +7,8 @@ from logging_config import *
 from twisted.internet import protocol, reactor
 import signal
 
+logging_enabled = False
+
 # This is a workaround for older versions of twisted that use SIGCHLD, but
 # do not set SA_RESTART.
 def sa_restart_hack():
@@ -23,13 +25,14 @@ class CommandWithOutput(protocol.ProcessProtocol):
         self.restart_delay = 0.2
         self.logger = logging.getLogger(name)
         self.console_logger = logging.getLogger('console.%s'%name)
-        logger_handler = logging.handlers.TimedRotatingFileHandler(os.path.join(logdir,'%s.log'%name), when='midnight', backupCount=logfilecount)
-        logger_handler.setFormatter(file_formatter)
-        self.logger.addHandler(logger_handler)
-        self.console_logger.addHandler(logger_handler)
+        if logging_enabled:
+            logger_handler = logging.handlers.TimedRotatingFileHandler(os.path.join(logdir,'%s.log'%name), when='midnight', backupCount=logfilecount)
+            logger_handler.setFormatter(file_formatter)
+            self.logger.addHandler(logger_handler)
+            self.console_logger.addHandler(logger_handler)
+            logger_handler.setLevel(logging.DEBUG)
         self.logger.setLevel(logging.DEBUG)
         self.console_logger.setLevel(logging.DEBUG)
-        logger_handler.setLevel(logging.DEBUG)
         self.proc_args = args
         self.outline = ""
         self.errline = ""

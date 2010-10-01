@@ -51,7 +51,9 @@ class DhcpAddressSetter(_DhcpSetterCommon):
             ip = new_state['ip']
             ip_slashed = new_state['ip_slashed']
             yield system.system('ip', 'addr', 'add', ip_slashed, 'dev', self.iface)
+            # Send both request and response gratuitous arp.
             yield system.system('arping', '-q', '-c', '1', '-A', '-I', self.iface, ip)
+            yield system.system('arping', '-q', '-c', '1', '-U', '-I', self.iface, ip)
 
 class DhcpRouteSetter(_DhcpSetterCommon):
     def __init__(self, iface, table, state_pub):

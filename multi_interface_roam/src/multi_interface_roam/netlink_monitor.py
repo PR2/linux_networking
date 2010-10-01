@@ -159,7 +159,7 @@ def print_status(iface):
 
 def main():
     from twisted.internet import reactor
-    iface = 'eth1'
+    iface = 'wlan0'
     try:
         print_status(iface)
         reactor.run()

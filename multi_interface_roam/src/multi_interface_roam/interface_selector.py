@@ -8,6 +8,7 @@ import ip_rule
 import config
 import time
 import sys
+import radio_manager
 
 class RULEID:
     LOCAL=100
@@ -22,6 +23,7 @@ class InterfaceSelector:
         self.interfaces = {}
         self.update_event = event.Event()
         self.update_interval = 1
+        self.radio_manager = radio_manager.RadioManager()
 
         # Add rules to guarantee that local routes go to the main table.
         local_net_rule = ip_rule.IpRule(RULEID.LOCAL)
@@ -33,7 +35,7 @@ class InterfaceSelector:
         ifaceid = RULEID.FIRST_IFACE
         for iface in interface_names:
             try:
-                self.interfaces[iface] = interface.construct(iface, ifaceid)
+                new_iface = self.interfaces[iface] = interface.construct(iface, ifaceid)
                 ifaceid += 1
             except interface.NoType:
                 print >> sys.stderr, "Interface %s has no type."%iface
@@ -42,6 +44,11 @@ class InterfaceSelector:
                 print >> sys.stderr, "Error creating interface %s."%iface
                 raise
 
+        # Register the radios with the radio manager
+        for i in self.interfaces.itervalues():
+            if isinstance(i, interface.WirelessInterface):
+                self.radio_manager.add_iface(i)
+        
         # Prepare the rules that select a particular interface.
         self.tun_ip_rules = [ip_rule.IpRule(RULEID.TUNNEL+i) for i in range(len(self.interfaces))]
         
@@ -100,6 +107,7 @@ class InterfaceSelector:
         # Print active_iface status
         now = time.time()
         print
+        print time.ctime(now), now
         for rank, iface in enumerate(interfaces):
             # FIXME
             iface.timeout_time = now

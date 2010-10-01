@@ -6,6 +6,9 @@ import dhcp
 from dhcp_apply_config import DhcpAddressSetter, DhcpRouteSetter, DhcpSourceRuleSetter
 import config
 from netlink_monitor import netlink_monitor, IFSTATE
+import radio_sm
+import traceback
+import pythonwifi.iwlibs
 
 class Interface:
     def __init__(self, iface, tableid, name):
@@ -56,6 +59,9 @@ class WiredInterface(DhcpInterface):
 
 class WirelessInterface(DhcpInterface):
     def __init__(self, iface, tableid):
+        self.wifi = pythonwifi.iwlibs.Wireless(iface)
+        self.iwinfo = pythonwifi.iwlibs.WirelessInfo(iface)
+        self.radio_sm = radio_sm.radio_sm(iface)
         DhcpInterface.__init__(self, iface, tableid)
 
     def _update_specialized(self):

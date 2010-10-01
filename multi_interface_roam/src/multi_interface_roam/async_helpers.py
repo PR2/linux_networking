@@ -6,7 +6,7 @@ from collections import deque
 from weakcallback import WeakCallbackCb
 import weakref
 import sys
-from event import Unsubscribe
+from event import Unsubscribe, Event
 
 # FIXME Add test for ReadDescrEventStream
 
@@ -39,11 +39,13 @@ def wait_for_state(state, condition):
 
 class EventStream:
     """Event stream class to be used with select and switch."""
-    def __init__(self):
+    def __init__(self, event = None):
         self._queue = deque()
         self._invoke_listener = None
         self.put = WeakCallbackCb(self._put)
         self.discard = False
+        if event:
+            event.subscribe_repeating(self.put)
 
     def _put(*args, **kwargs):
         """Puts an element into the queue, and notifies an eventual
@@ -174,6 +176,11 @@ def wrap_function(f):
     return run_f
 
 @wrap_function
+def mainThreadCallback(f, *args, **kwargs):
+    "Decorator that causes the function to be called in the main thread."
+    reactor.callFromThread(f, *args, **kwargs)
+
+@wrap_function
 def async_test(f, *args, **kwargs):
     "Starts an asynchronous test, waits for it to complete, and returns its result."
     result = []
@@ -220,9 +227,9 @@ def unittest_with_reactor(run_ros_tests):
     
 if __name__ == "__main__":
     import unittest
-    import threading
     import sys
     import gc
+    import threading
     #from twisted.internet.defer import setDebugging
     #setDebugging(True)
 
@@ -266,6 +273,14 @@ if __name__ == "__main__":
             self.assertEqual(len(reactor.getDelayedCalls()), 0)
             yield select(Timeout(0.3), Timeout(0.001))
             self.assertEqual(len(reactor.getDelayedCalls()), 0)
+        
+        @async_test
+        def test_event_stream_from_event(self):
+            e = Event()
+            es = EventStream(e)
+            e.trigger('hello world')
+            yield select(es)
+            self.assertEqual(es.get(), (('hello world',),{}))
             
     class SelectTest(unittest.TestCase):
         @async_test
@@ -345,9 +360,24 @@ if __name__ == "__main__":
                     }, multiple = True)
             self.assertRaises(IndexError, es._queue.pop)
 
+    class DecoratorTest(unittest.TestCase):
+        def test_main_thread_callback(self):
+            "Tests that mainThreadCallback works."
+            done = []
+            @mainThreadCallback
+            def cb(*args, **kwargs):
+                done.append((args, kwargs))
+            threading.Thread(target=cb, args=[1,2], kwargs={'a':'b'}).start()
+            for i in range(0, 100):
+                if done:
+                    break
+                reactor.iterate(0.02)
+            self.assertEqual(done, [((1,2), {'a':'b'})])
+
     def run_ros_tests():
         rostest.unitrun('multi_interface_roam', 'eventstream', EventStreamTest)
         rostest.unitrun('multi_interface_roam', 'select', SelectTest)
         rostest.unitrun('multi_interface_roam', 'switch', SwitchTest)
+        rostest.unitrun('multi_interface_roam', 'decorators', DecoratorTest)
 
     unittest_with_reactor(run_ros_tests)

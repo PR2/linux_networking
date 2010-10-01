@@ -28,4 +28,4 @@ def get_parameter(name, default = NoDefault):
         if default is not NoDefault:
             return default
     
-    raise KeyError("Could not find parameter %s.")
+    raise KeyError("Could not find parameter %s."%name)
