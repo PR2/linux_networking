@@ -214,7 +214,7 @@ public:
     network_list_publisher_ = nh_.advertise<wpa_supplicant_node::NetworkList>("network_list", 1, true);
     frequency_list_publisher_ = nh_.advertise<wpa_supplicant_node::FrequencyList>("frequency_list", 1, true);
     association_publisher_ = nh_.advertise<wpa_supplicant_node::AssociateFeedback>("association_state", 1, true);
-    scan_publisher_ = nh_.advertise<wpa_supplicant_node::AssociateFeedback>("scan_results", 1, true);
+    scan_publisher_ = nh_.advertise<wpa_supplicant_node::ScanResult>("scan_results", 1, true);
 
     publishFrequencyList();
     publishNetworkList();
@@ -239,18 +239,19 @@ public:
     
     eloop_cancel_timeout(scanTimeoutHandler, wpa_s_, NULL);
     
+    wpa_supplicant_node::ScanResult rslt;
+    fillRosResp(rslt, *scan_res);
+    scan_publisher_.publish(rslt);
+
     if (current_scan_ == null_scan_goal_handle_)
-      ROS_ERROR("scanCmopleted with current_scan_ not set.");
+      ROS_ERROR("scanCompleted with current_scan_ not set.");
     else
     {
       if (scan_res)
       {
         // TODO copy output to response.
         ROS_INFO("Scan completed successfully.");
-        wpa_supplicant_node::ScanResult rslt;
-        fillRosResp(rslt, *scan_res);
         current_scan_.setSucceeded(rslt);
-        scan_publisher_.publish(rslt);
       }
       else
       {
@@ -539,7 +540,7 @@ private:
       bss.capabilities = cur.caps;
       bss.beacon_interval = cur.beacon_int;
       bss.frequency = cur.freq;
-      bss.age = cur.age / 1000.0;
+      bss.stamp = ros::Time::now() - ros::Duration(cur.age / 1000.0);
       rslt.bss.push_back(bss);
     }
   }
@@ -717,7 +718,7 @@ void ros_deinit()
 
 void ros_add_iface(wpa_supplicant *wpa_s)
 {
-  wpa_s->ros_api = new ros_interface(ros::NodeHandle(), wpa_s);
+  wpa_s->ros_api = new ros_interface(ros::NodeHandle("wifi"), wpa_s);
 }
 
 void ros_remove_iface(wpa_supplicant *wpa_s)

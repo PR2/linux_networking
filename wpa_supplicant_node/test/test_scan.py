@@ -88,9 +88,9 @@ if __name__ == '__main__':
     try:
         # Initializes a rospy node so that the SimpleActionClient can
         # publish and subscribe over ROS.
-        rospy.init_node('test_scan')
         import sys
         iface = sys.argv[1]
+        rospy.init_node('test_scan'+iface)
         t = Test(iface)              
         count = 0
         while not rospy.is_shutdown():

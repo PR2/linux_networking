@@ -1751,7 +1751,7 @@ static int wpa_driver_nl80211_scan(void *priv,
 	if (num_freqs)
           timeout = num_freqs * 250;
         wpa_printf(MSG_DEBUG, "Scan requested (ret=%d) - scan timeout %d "
-		   "seconds", ret, timeout);
+		   "milliseconds", ret, timeout);
 	eloop_cancel_timeout(wpa_driver_nl80211_scan_timeout, drv, drv->ctx);
 	eloop_register_timeout(timeout / 1000, (timeout % 1000) * 1000, wpa_driver_nl80211_scan_timeout,
 			       drv, drv->ctx);
