@@ -6,6 +6,20 @@ import wpa_supplicant_node.msg
 from actionlib_msgs.msg import GoalStatus
 import os
 
+frequencylist = [5240, 5260, 5805, 2437]
+bssidlist = [
+  "00:24:6C:81:D5:E8", # willow blaise-office
+  "00:24:6C:82:4E:F8", # willow lab
+  #"00:24:6C:81:4E:FA", # willow-wpa2
+  #"00:24:6C:81:D5:E0", # willow
+  #"00:24:6C:81:D5:EA", # willow-wpa2
+  ]
+essidlist = [
+  #"willow-wpa2",
+  "blaise-test",
+  #"willow",
+  ]
+
 def bssid_to_str(bssid):
     return ":".join(["%02X"%ord(c) for c in bssid])
 
@@ -95,42 +109,12 @@ if __name__ == '__main__':
         count = 0
         while not rospy.is_shutdown():
             count += 1
-            #if count % 2:
-            #    result = t.scan([], [5805])
-            #else:
-            #    result = t.scan([], [2437])
-            #result = t.scan([], [])
-            #result = t.scan([], [5260, 5805])
-            result = t.scan([], [5240, 5260, 5805, 2437])
-            #if count > 1:
-            print len(result.bss)
-            #    rospy.sleep(rospy.Duration(0.5))
-            #    continue
-            #rospy.sleep(rospy.Duration(0.2))
-            #continue
-            #for b in result.bss:
-            #    print "%s %s"%(bssid_to_str(b.bssid), b.ssid)
-            #continue
-            #result = t.scan([], [2437, 2462, 5240, 5260, 5805])
-            #if not result.bss:
-            #    raise Exception("No scan output!")
-            #print result
+            result = t.scan([], frequencylist)
+            print "Scanned %i bsses."%len(result.bss)
             for i in range(0,5):
                 for bss in result.bss:
                     if rospy.is_shutdown():
                         raise KeyboardInterrupt
-                    bssidlist = [
-                      #"00:24:6C:81:4E:FA", # willow-wpa2
-                      #"00:24:6C:81:D5:E0", # willow
-                      #"00:24:6C:81:D5:EA", # willow-wpa2
-                      "00:24:6C:81:D5:E8", # willow blaise-office
-                      "00:24:6C:82:4E:F8", # willow lab
-                      ]
-                    essidlist = [
-                      #"willow-wpa2",
-                      "blaise-test",
-                      #"willow",
-                      ]
                     if bssid_to_str(bss.bssid) in bssidlist or \
                        bss.ssid in essidlist:
                         #print "Network found. Associating... %s %s %i"%(bss.ssid, bssid_to_str(bss.bssid), bss.frequency)
