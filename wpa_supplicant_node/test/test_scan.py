@@ -27,11 +27,11 @@ class Test:
     def __init__(self, iface):
         self.assoc_tries = 0
         self.assoc_successes = 0
-        self.scan_action = actionlib.SimpleActionClient(iface+"/scan", wpa_supplicant_node.msg.ScanAction)
+        self.scan_action = actionlib.SimpleActionClient('wifi/'+iface+"/scan", wpa_supplicant_node.msg.ScanAction)
         rospy.loginfo("Waiting for scan server.")
         self.scan_action.wait_for_server()
         
-        self.assoc_action = actionlib.SimpleActionClient(iface+"/associate", wpa_supplicant_node.msg.AssociateAction)
+        self.assoc_action = actionlib.SimpleActionClient('wifi/'+iface+"/associate", wpa_supplicant_node.msg.AssociateAction)
         rospy.loginfo("Waiting for associate server.")
         self.assoc_action.wait_for_server()
 
