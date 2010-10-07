@@ -31,10 +31,21 @@ def now():
 def wait_for_state(state, condition):
     d = Deferred()
     def cb(old_state, new_state):
+        #print "wait_for_state, cb", old_state, new_state, condition 
         if condition(new_state):
+            #print "wait_for_state, cb, hit"
             d.callback(new_state)
             raise Unsubscribe
     state.subscribe(cb)
+    return d
+
+def wait_for_event(event, condition):
+    d = Deferred()
+    def cb(*args, **kwargs):
+        if condition(args, kwargs):
+            d.callback(*args, **kwargs)
+            raise Unsubscribe
+    event.subscribe_repeating(cb)
     return d
 
 class EventStream:
@@ -99,6 +110,9 @@ class EventStreamFromDeferred(EventStream):
 
 def StateCondition(*args, **kwargs):
     return EventStreamFromDeferred(wait_for_state(*args, **kwargs))
+
+def EventCondition(*args, **kwargs):
+    return EventStreamFromDeferred(wait_for_event(*args, **kwargs))
 
 class Timeout(EventStream):
     def __init__(self, timeout):

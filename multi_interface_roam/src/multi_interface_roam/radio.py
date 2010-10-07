@@ -5,6 +5,7 @@ import wpa_supplicant_node.msg as wpa_msgs
 import actionlib                       
 import state_publisher
 import event
+from twisted.internet.defer import Deferred
 from twisted.internet import reactor
 from async_helpers import mainThreadCallback
 
@@ -22,12 +23,21 @@ class Network:
         except KeyError: 
             self.ssid = None
 
-class AssociationState:
-    def __nonzero__(self):
+class AssociationState(type):
+    def __new__(meta, classname, bases, classDict):
+        return type.__new__(meta, classname, bases, classDict)
+    def __nonzero__(cls):
         return False
 
-Associating = AssociationState()
-Unassociated = AssociationState()
+class Associating(object):
+    __metaclass__ = AssociationState
+
+class Unassociated(object):
+    __metaclass__ = AssociationState
+
+def is_not_associating(state):
+    print state, id(state), id(Associating)
+    return state != Associating 
 
 class Radio:
     def __init__(self, interface_name):
@@ -35,13 +45,18 @@ class Radio:
         self.associated = state_publisher.StatePublisher(False)
         self.frequency_list = state_publisher.StatePublisher([])
         self.network_list = state_publisher.StatePublisher([])
-        self.scan_event = event.Event()
+        self.scan_results_event = event.Event()
         self.scanning = state_publisher.StatePublisher(False)
+
+        #def debug_assoc(iface, old_state, new_state):
+        #    print "Assoc change", iface, new_state
+        #self.associated.subscribe(debug_assoc, interface_name)
 
         self.networks = []
         self.hidden_networks = []
         self.raw_scan_results = []
         self.scan_results = []
+        self.scan_deferred = None
 
         prefix = rospy.resolve_name("wifi")+"/"+interface_name+"/"
         rospy.Subscriber(prefix + "association_state", wpa_msgs.AssociateFeedback, self._association_state_callback)
@@ -63,6 +78,8 @@ class Radio:
         #print "scan goal", goal
         self._scan_action.send_goal(goal, done_cb = self._scan_done_callback)
         self.scanning.set(True)
+        self.scan_deferred = Deferred()
+        return self.scan_deferred
 
     def cancel_scans(self):
         self.scanning = False
@@ -74,13 +91,16 @@ class Radio:
         self._associate_action.send_goal(wpa_msgs.AssociateGoal(ssid, bssid))
         self.associated.set(Associating)
 
-    def unassociate():
+    def unassociate(self):
         self._associate_action.cancel_all_goals()
 
     @mainThreadCallback
     def _scan_done_callback(self, state, rslt):
         """Called when all our scans are done."""
         self.scanning.set(False)
+        if self.scan_deferred:
+            self.scan_deferred.callback(rslt.success)
+        self.scan_deferred = None
 
     @mainThreadCallback
     def _frequency_list_callback(self, msg):
@@ -103,7 +123,7 @@ class Radio:
 
     def _filter_raw_scan_results(self):
         self.scan_results = [ bss for bss in self.raw_scan_results if self.enabled_bss(bss) ]
-        self.scan_event.trigger(self.scan_results)
+        self.scan_results_event.trigger(self.scan_results)
     
     @mainThreadCallback
     def _scan_results_callback(self, msg):

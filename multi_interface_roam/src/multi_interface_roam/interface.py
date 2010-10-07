@@ -14,6 +14,7 @@ class Interface:
     def __init__(self, iface, tableid, name):
         self.iface = iface
         self.name = name
+        self.active = True
         self.priority = config.get_interface_parameter(iface, 'priority', 0)
         src_rule_setter = DhcpSourceRuleSetter(iface, tableid, tableid)
         self.tableid = str(tableid)
@@ -59,10 +60,11 @@ class WiredInterface(DhcpInterface):
 
 class WirelessInterface(DhcpInterface):
     def __init__(self, iface, tableid):
+        DhcpInterface.__init__(self, iface, tableid)
+        self.active = False
         self.wifi = pythonwifi.iwlibs.Wireless(iface)
         self.iwinfo = pythonwifi.iwlibs.WirelessInfo(iface)
         self.radio_sm = radio_sm.radio_sm(iface)
-        DhcpInterface.__init__(self, iface, tableid)
 
     def _update_specialized(self):
         has_link = self.status > IFSTATE.LINK_ADDR 
@@ -166,6 +168,9 @@ class StaticRouteInterface(Interface):
 class NoType(Exception):
     pass
 
+class UnknownType(Exception):
+    pass
+
 def construct(iface, tableid):
     try:
         type = config.get_interface_parameter(iface, 'type')
@@ -175,6 +180,7 @@ def construct(iface, tableid):
             return WirelessInterface(iface, tableid)
         if type == "static":
             return StaticRouteInterface(iface, tableid)
+        raise UnknownType(type)
     except config.NoDefault:
         raise NoType()
 

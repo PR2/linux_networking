@@ -24,6 +24,7 @@ class InterfaceSelector:
         self.update_event = event.Event()
         self.update_interval = 1
         self.radio_manager = radio_manager.RadioManager()
+        self.inactive_penalty = config.get_parameter('inactive_penalty', 50)
 
         # Add rules to guarantee that local routes go to the main table.
         local_net_rule = ip_rule.IpRule(RULEID.LOCAL)
@@ -40,6 +41,9 @@ class InterfaceSelector:
             except interface.NoType:
                 print >> sys.stderr, "Interface %s has no type."%iface
                 sys.exit(1)
+            except interface.UnknownType, e:
+                print >> sys.stderr, "Interface %s has unknown type %s."%(iface, e)
+                sys.exit(1)
             except:
                 print >> sys.stderr, "Error creating interface %s."%iface
                 raise
@@ -55,8 +59,8 @@ class InterfaceSelector:
         # Set up periodic updates, and run the first one.
         self._periodic_update()
 
-    def set_mode(self, ssid = "", bssid = "", sel_interface = "", use_tunnel = True):
-        pass
+    def set_mode(self, ssid = "", bssid = "", sel_interface = "", use_tunnel = True, band = 3):
+        self.radio_manager.set_mode(ssid, bssid, band)
 
     def _periodic_update(self):
         self.periodic_update_handle = reactor.callLater(self.update_interval, self._periodic_update)
@@ -83,13 +87,18 @@ class InterfaceSelector:
     
     TERRIBLE_INTERFACE = -1e1000
 
-    @staticmethod
-    def score_interface(iface):
+    def score_interface(self, iface):
+        # score is used for selecting the interface.
+        # prescore is used by radio manager to decide which interface to
+        # activate.
+        
         if iface.goodness <= 0:
-            iface.score = InterfaceSelector.TERRIBLE_INTERFACE
+            iface.prescore = iface.score = InterfaceSelector.TERRIBLE_INTERFACE
             return
 
-        iface.score = iface.goodness + iface.reliability + iface.priority
+        iface.prescore = iface.score = iface.goodness + iface.reliability + iface.priority
+        if not iface.active:
+            iface.score -= self.inactive_penalty
 
     def rank_interfaces(self):        
         # Score interfaces
@@ -111,7 +120,5 @@ class InterfaceSelector:
         for rank, iface in enumerate(interfaces):
             # FIXME
             iface.timeout_time = now
-            iface.bssid = ""
-            
-            print "#% 2i %10s %5.1f %3.3f %17s %7.3f %3.0f"% \
+            print "#% 2i %10.10s %7.1f %6.3f %17.17s %7.3f %3.0f"% \
                     (rank, iface.name, (iface.timeout_time - now), iface.score, iface.bssid, iface.goodness, iface.reliability)

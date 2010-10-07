@@ -1,3 +1,4 @@
+import radio
 import time
 import state_publisher
 import config
@@ -5,13 +6,24 @@ from twisted.internet import reactor
 import mac_addr
 import event
 import multiset
+from twisted.internet.defer import inlineCallbacks
+import async_helpers
+import random
+
+def check_band(freq, bands):
+    if freq < 3000 and bands & 1:
+        return True
+    if freq > 4000 and bands & 2:
+        return True
+    return False
 
 class Frequency:
     def __init__(self, freq, period):
-        self.freq = freq
+        self.frequency = freq
         self.period = period
         self.next_scan_time_by_iface = {}
         self.next_scan_time = 0
+        self.do_not_retry_before = {}
         self.interfaces = multiset.Multiset()
         self.last_hit = 0
 
@@ -34,9 +46,13 @@ class NoFrequenciesReady(Exception):
 class FrequencyList:
     def __init__(self):
         self.frequencies = {}
-        self.scan_period_cold = config.get_parameter('scan_period_cold', 20)
+        self.bands = 0
+        self.scan_period_cold = config.get_parameter('scan_period_cold', 10)
         self.scan_period_warm = config.get_parameter('scan_period_warm', 5)
         self.scan_period_hot = config.get_parameter('scan_period_hot', 2)
+        self.scan_reschedule_delay = config.get_parameter('scan_reschedule_delay', 2)
+        self.scan_period_randomness = config.get_parameter('scan_period_randomness', 0)
+        self.min_scan_interval = config.get_parameter('min_scan_interval', 1)
 
     def add(self, freq, iface):
         if freq not in self.frequencies:
@@ -51,7 +67,7 @@ class FrequencyList:
             now = time.time()
 
         # Which frequencies can we consider?
-        active_freqs = filter(lambda f: iface in f.interfaces, self.frequencies.itervalues())
+        active_freqs = filter(lambda f: iface in f.interfaces and check_band(f.frequency, self.bands), self.frequencies.itervalues())
         
         # Pick the frequency with the next expiry time.
         try:
@@ -61,12 +77,18 @@ class FrequencyList:
         
         # If no frequency has expired, take into account when it was last seen by this interface.
         if freq.next_scan_time > now:
+            #print "Pondering frequencies that have not been updated recently on ", iface.name
             freq = min(active_freqs, key = lambda f: f.next_scan_time_by_iface.get(iface,0))
         
-        if not allow_early and freq.next_scan_time > now:
-            raise NoFrequenciesReady(freq.next_scan_time)
-        freq.update_next_scan_time(iface, now + freq.period)
-        return freq.freq
+        earliest_scan_time = freq.do_not_retry_before.get(iface, 0)
+        if not allow_early:
+            earliest_scan_time = max(earliest_scan_time, freq.next_scan_time)
+        if earliest_scan_time > now:
+            raise NoFrequenciesReady(earliest_scan_time)
+        rand_period = freq.period * (0.5 + self.scan_period_randomness * random.random())
+        freq.update_next_scan_time(iface, now + rand_period)
+        freq.do_not_retry_before[iface] = now + self.min_scan_interval
+        return freq.frequency
 
     def next_scan_freqs(self, iface, count, allow_early = False):
         now = time.time()
@@ -85,6 +107,11 @@ class FrequencyList:
         f = self.frequencies[freq]
         f.set_period(period)
 
+    def reschedule(self, iface, freqs):
+        when = time.time() + self.scan_reschedule_delay
+        for f in freqs:
+            self.frequencies[f].update_next_scan_time(iface, when)
+
     def hit(self, freq, stamp):
         """Called each time a bss is seen."""
         try:
@@ -99,13 +126,13 @@ class Bss:
         self.ssid = bss.ssid
         self.bssid = bss.bssid
         self.by_iface = {}
-        self.freq = bss.frequency
+        self.frequency = bss.frequency
     
     def update(self, bss, iface):
         assert bss.ssid == self.ssid
         assert bss.bssid == self.bssid
-        if self.freq != bss.frequency:
-            print "Frequency for bss %s, %s has changed.", mac_addr.packed_to_str(bss.bssid), bss.ssid # FIXME
+        if self.frequency != bss.frequency:
+            print "Frequency for bss %s, %s has changed from %i to %i MHz."%(mac_addr.packed_to_str(bss.bssid), bss.ssid, self.frequency, bss.frequency) # FIXME
         self.by_iface[iface] = bss
 
     def last_seen(self, iface):
@@ -130,12 +157,12 @@ class BssList:
 
         if False: # Gives an overview of currently known bsses.
             all = self.bsses.items()
-            all.sort(key=lambda (x,y):(y.freq, x))
+            all.sort(key=lambda (x,y):(y.frequency, x))
             now = time.time()
             print "\033[2J"
             print "\033[0;0H"
             for _, bss in all:
-                print mac_addr.packed_to_str(bss.bssid), "%20.20s"%bss.ssid, bss.freq,
+                print mac_addr.packed_to_str(bss.bssid), "%20.20s"%bss.ssid, bss.frequency,
                 ifaces = bss.by_iface.keys()
                 ifaces.sort()
                 min_stamp = now - max(bss.by_iface.itervalues(), key = lambda bss: bss.stamp).stamp.to_sec()
@@ -162,39 +189,62 @@ class BssList:
 
 class ScanManager:
     def __init__(self):
+        self.failed_scan_delay = config.get_parameter('failed_scan_delay', 1)
         self.scan_results = {}
         self.frequencies = FrequencyList()
         self.num_scan_frequencies = config.get_parameter('num_scan_frequencies', 4)
-        self.scheduled_scan = None
+        self.scheduled_scan = {}
         self.bss_list = BssList(self.frequencies)
         self.new_scan_data = event.Event()
 
     def add_iface(self, iface):
+        # Subscribe to state changes that might cause us to trigger a scan.
         iface.radio_sm.scanning.subscribe(self._scanning_state_cb, iface)
-        iface.radio_sm.scan_event.subscribe_repeating(self._scan_event_cb, iface)
+        iface.radio_sm.associated.subscribe(self._scanning_state_cb, iface)
         iface.radio_sm.scanning_enabled.subscribe(self._scanning_state_cb, iface)
+        
+        # Subscribe to scan results
+        iface.radio_sm.scan_results_event.subscribe_repeating(self._scan_event_cb, iface)
+        # Subscribe to changes in frequency list
         iface.radio_sm.frequency_list.subscribe(self._frequency_list_cb, iface)
 
     def _scanning_state_cb(self, iface, old_state, new_state):
         """A state change that might cause us to start scanning has occurred."""
         self._trigger_scan(iface)
 
+    @inlineCallbacks
     def _trigger_scan(self, iface):
+        #if iface.radio_sm.associated.get():
+        #    async_helpers.async_sleep(0.1)
         #print "_trigger_scan", iface.name 
-        if self.scheduled_scan:
-            if self.scheduled_scan.active():
-                self.scheduled_scan.cancel()
-            self.scheduled_scan = None
+        if iface in self.scheduled_scan:
+            if self.scheduled_scan[iface].active():
+                self.scheduled_scan[iface].cancel()
+            del self.scheduled_scan[iface]
         if not iface.radio_sm.scanning_enabled.get() or iface.radio_sm.scanning.get():
+            #print "_trigger_scan bailing", iface.radio_sm.scanning_enabled.get(), iface.radio_sm.scanning.get()
             return # We are not in a scanning state, or we are currently scanning.
         try:
-            freqs = self.frequencies.next_scan_freqs(iface, self.num_scan_frequencies, not iface.radio_sm.associated.get())
+            #print "_trigger_scan association", iface.radio_sm.associated.get(), not iface.radio_sm.associated.get()
+            #if iface.radio_sm.associated.get():
+            #    return # FIXME Take this out once associated scanning works well.
+            if iface.radio_sm.associated.get():
+                freqs = self.frequencies.next_scan_freqs(iface, 1, False)
+            else:
+                freqs = self.frequencies.next_scan_freqs(iface, self.num_scan_frequencies, True)
         except NoFrequenciesReady, nfr:
             if nfr.next_time:
-                self.scheduled_scan = reactor.callLater(max(0.1, nfr.next_time - time.time()), self._trigger_scan, iface)
+                self.scheduled_scan[iface] = reactor.callLater(max(0.1, nfr.next_time - time.time()), self._trigger_scan, iface)
+                #print "No frequencies for ", iface.name, nfr.next_time - time.time()
+            #else:
+                #print "No frequencies for", iface.name
         else:
-            iface.radio_sm.scan(freqs)
-            #print "Triggered scan", iface.name, freqs
+            print "Triggering scan", iface.name, freqs
+            rslt = yield iface.radio_sm.scan(freqs)
+            if not rslt:
+                print "Scan failed", iface.name, freqs
+                yield async_helpers.async_sleep(self.failed_scan_delay)
+                self.frequencies.reschedule(iface, freqs)
 
     def _scan_event_cb(self, iface, bsses):
         self.bss_list.update(bsses, iface)
@@ -213,6 +263,8 @@ class ScanManager:
 
 class RadioManager:
     def __init__(self):
+        self.forced_ssid = ""
+        self.forced_bssid = ""
         self.scan_manager = ScanManager()
         self.initial_inhibit_end = time.time() + config.get_parameter('initial_assoc_inhibit', 5)
         self.bss_expiry_time = config.get_parameter('bss_expiry_time', 5)
@@ -222,30 +274,70 @@ class RadioManager:
     def add_iface(self, iface):
         self.scan_manager.add_iface(iface)
         self.interfaces.add(iface)
+        iface.radio_sm.associated.subscribe(self._associated_cb, iface)
+
+    def set_mode(self, ssid, bssid, band):
+        self.forced_ssid = ssid
+        self.forced_bssid = bssid
+        self.forced_band = band
+        self.scan_manager.frequencies.bands = band
+        for iface in self.interfaces:
+            self._check_cur_bss(iface)
+            self.scan_manager._trigger_scan(iface) # In case there were no frequencies before.
+    
+    def _associated_cb(self, iface, old_state, new_state):
+        self._check_cur_bss(iface)
+
+    def _check_cur_bss(self, iface):
+        """Makes sure that the current bss satisfies forcing constraints."""
+        print "_check_cur_bss"
+        cur_bss = iface.radio_sm.associated.get()
+        if not cur_bss:
+            return
+        if not self.check_bss_matches_forcing(cur_bss):
+            print iface.name, "associated to", cur_bss.ssid, mac_addr.packed_to_str(cur_bss.bssid), cur_bss.frequency
+            print "but want", self.forced_ssid, self.forced_ssid, self.forced_band
+            print "Unassociating because bss does not match requirements."
+            iface.radio_sm.unassociate()
+
+    def check_bss_matches_forcing(self, bss):
+        """Checks that the bss matches the forced bssid, ssid and band."""
+        if not check_band(bss.frequency, self.forced_band):
+            return False
+        if self.forced_bssid and self.forced_bssid != bss.bssid:
+            return False
+        if self.forced_ssid and self.forced_ssid != bss.ssid:
+            return False
+        return True
 
     def _new_scan_data(self):
-        print "_new_scan_data"
+        #print "_new_scan_data"
         now = time.time()
         if now < self.initial_inhibit_end:
             print "inhibited"
             return
         for iface in self.interfaces:
-            if iface.radio_sm.scanning_enabled.get():
+            cur_assoc = iface.radio_sm.associated.get()
+            if iface.radio_sm.scanning_enabled.get() and cur_assoc != radio.Associating:
                 # Pick the best bss for this interface.
                 candidate_bsses = filter(lambda bss: bss.last_seen(iface) > now - self.bss_expiry_time, 
                         self.scan_manager.bss_list.bsses.itervalues())
+                candidate_bsses = filter(self.check_bss_matches_forcing, candidate_bsses)
+                if not candidate_bsses:
+                    print "No candidate bsses."
+                    continue
                 best_bss = max(candidate_bsses, key = lambda bss: bss.by_iface[iface].level)
 
                 # If we are associated, do we want to switch?
-                cur_assoc = iface.radio_sm.associated.get()
-                print cur_assoc
                 if cur_assoc:
-                    break
+                    #print "Already associated", iface.name, cur_assoc
+                    continue
+                #print iface.name, cur_assoc
                     #if cur_assoc.level + 15 > best_bss.level:
                     #    break
 
                 # Let's associate
-                print "associating", iface.name, "to", mac_addr.packed_to_str(best_bss.bssid), best_bss.ssid
+                print "associating", iface.name, "to", mac_addr.packed_to_str(best_bss.bssid), best_bss.ssid, cur_assoc
                 iface.radio_sm.associate_request.trigger(best_bss.id)
 
 

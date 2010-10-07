@@ -37,12 +37,14 @@ class RoamNode:
             config['interface'] = ''
         interface = config['interface']
         ssid = config['ssid'] = config['ssid'][0:32]
+        bssid = ""
         if not mac_addr.is_str(config['bssid']):
             config['bssid'] = ""
-        bssid = config['bssid']
+        else:
+            bssid = mac_addr.str_to_packed(config['bssid'])
         use_tunnel = config['use_tunnel']
 
-        self.interface_selector.set_mode(ssid, bssid, interface, use_tunnel)
+        self.interface_selector.set_mode(ssid, bssid, interface, use_tunnel, config['band'])
 
         return config
 

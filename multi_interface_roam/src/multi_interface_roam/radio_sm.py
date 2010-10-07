@@ -18,12 +18,14 @@ class RadioSmData:
         self.scanning_enabled = state_publisher.StatePublisher(False)
         self.associate_request = event.Event()
         self.disactivate_delay = 1
+        self.pre_up_sleep = 1
         
         # Copy radio members that we are willing to expose
+        self.unassociate = self._radio.unassociate
         self.associated = self._radio.associated
         self.scanning = self._radio.scanning
         self.scan = self._radio.scan
-        self.scan_event = self._radio.scan_event
+        self.scan_results_event = self._radio.scan_results_event
         self.frequency_list = self._radio.frequency_list
 
 class RadioSmState(smach.State):
@@ -36,6 +38,9 @@ class Down(RadioSmState):
     
     @inlineCallbacks
     def execute_async(self, ud):
+        # Wait a bit here because buggy drivers don't like to do things
+        # just as they are coming down.
+        yield async_helpers.async_sleep(ud.radio.pre_up_sleep)
         yield async_helpers.wait_for_state(ud.radio._up_state_pub, operator.truth)
         returnValue('up')
 
@@ -77,6 +82,7 @@ class Associating(RadioSmState):
     def execute_async(self, ud):
         ud.radio._radio.associate(*ud.radio.requested_bss[0], **ud.radio.requested_bss[1])
         
+        #print "Associating before", ud.radio.associated.get()
         events = yield async_helpers.select(
                 async_helpers.StateCondition(ud.radio._up_state_pub, operator.__not__ ),
                 async_helpers.StateCondition(ud.radio._radio.associated, lambda x: x != radio.Associating))
@@ -87,6 +93,7 @@ class Associating(RadioSmState):
         elif ud.radio.associated.get() == radio.Unassociated:
             returnValue('failed')
         else:
+            #print "Associated", ud.radio.iface_name, ud.radio.associated.get()
             returnValue('associated')
 
 class Associated(RadioSmState):
@@ -99,6 +106,7 @@ class Associated(RadioSmState):
         # we select.
         reactor.callLater(0, ud.radio.scanning_enabled.set, True)
         assoc_event_stream = async_helpers.EventStream(ud.radio.associate_request)
+        #print "Associated before", ud.radio.associated.get()
         events = yield async_helpers.select(
                 async_helpers.StateCondition(ud.radio._up_state_pub, operator.__not__ ),
                 async_helpers.StateCondition(ud.radio.activate_request, operator.truth),
@@ -110,6 +118,7 @@ class Associated(RadioSmState):
             returnValue('activate')
         if 2 in events:
             ud.radio.requested_bss = assoc_event_stream.get()
+            #print "Assoc changed", ud.radio.iface_name, ud.radio.requested_bss
             returnValue('reassociate')
         returnValue('unassociated')
 
@@ -149,9 +158,9 @@ def radio_sm(iface):
         smadd('DOWN', Down(),  transitions = { 'up' : 'UNASSOCIATED' })
         smadd('UNASSOCIATED', Unassociated(), transitions = { 'associate' : 'ASSOCIATING', 'down' : 'DOWN'})
         smadd('ASSOCIATING', Associating(), transitions = { 'associated' : 'ASSOCIATED', 'failed' : 'DOWN'})
-        smadd('ASSOCIATED', Associated(), transitions = { 'reassociate' : 'ASSOCIATING', 'activate' : 'ACTIVE', 'unassociated' : 'UNASSOCIATED'})
-        smadd('ACTIVE', Active(), transitions = { 'disactivate' : 'DISACTIVATING', 'unassociated' : 'UNASSOCIATED'} )
-        smadd('DISACTIVATING', Disactivating(), transitions = { 'done' : 'ASSOCIATED', 'activate' : 'ACTIVE', 'unassociated' : 'UNASSOCIATED'} )
+        smadd('ASSOCIATED', Associated(), transitions = { 'reassociate' : 'ASSOCIATING', 'activate' : 'ACTIVE', 'unassociated' : 'DOWN'})
+        smadd('ACTIVE', Active(), transitions = { 'disactivate' : 'DISACTIVATING', 'unassociated' : 'DOWN'} )
+        smadd('DISACTIVATING', Disactivating(), transitions = { 'done' : 'ASSOCIATED', 'activate' : 'ACTIVE', 'unassociated' : 'DOWN'} )
 
     ud = smach.UserData()
     ud.radio = RadioSmData(iface)
