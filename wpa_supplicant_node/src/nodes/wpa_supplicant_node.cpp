@@ -240,8 +240,11 @@ public:
     eloop_cancel_timeout(scanTimeoutHandler, wpa_s_, NULL);
     
     wpa_supplicant_node::ScanResult rslt;
-    fillRosResp(rslt, *scan_res);
-    scan_publisher_.publish(rslt);
+    if (scan_res)
+    {
+      fillRosResp(rslt, *scan_res);
+      scan_publisher_.publish(rslt);
+    }
 
     if (current_scan_ == null_scan_goal_handle_)
       ROS_ERROR("scanCompleted with current_scan_ not set.");
@@ -256,7 +259,7 @@ public:
       else
       {
         ROS_INFO("Scan failed.");
-        current_scan_.setAborted();
+        current_scan_.setAborted(rslt);
       }
       current_scan_ = null_scan_goal_handle_;
       lockedScanTryActivate();
@@ -288,7 +291,7 @@ public:
     lockedAssociateWork();
   }
   
-  void assocSucceeded(const u8 *bssid)
+  void assocSucceeded()
   {
     ROS_INFO("assocSucceeded");
     boost::recursive_mutex::scoped_lock lock(associate_mutex_);
@@ -297,6 +300,7 @@ public:
 
     wpa_supplicant_node::AssociateFeedback fbk;
     fbk.associated = true;
+    fillRosBss(fbk.bss, *wpa_s_->current_bss);
     // FIXME Set BSS.
     // FIXME Flag a problem if called twice.
     active_association_.publishFeedback(fbk);
@@ -522,8 +526,22 @@ private:
     requestAssociateWork();
   }
   
+  void fillRosBss(wpa_supplicant_node::Bss &ros_bss, wpa_bss &bss)
+  {
+    ros_bss.stamp = ros::Time(bss.last_update.sec + 1e-6 * bss.last_update.usec);
+    ros_bss.ssid.assign((const char *) bss.ssid, bss.ssid_len);
+    memcpy(&ros_bss.bssid[0], bss.bssid, sizeof(bss.bssid));
+    ros_bss.frequency = bss.freq;
+    ros_bss.beacon_interval = bss.beacon_int;
+    ros_bss.capabilities = bss.caps;
+    ros_bss.quality = bss.qual;
+    ros_bss.level = bss.level;
+    ros_bss.noise = bss.noise;
+  }
+  
   void fillRosResp(wpa_supplicant_node::ScanResult &rslt, wpa_scan_results &scan_res)
   {
+    rslt.success = true;
     rslt.bss.clear();
     for (size_t i = 0; i < scan_res.num; i++)
     {
@@ -628,7 +646,7 @@ private:
         if (wpa_req.freqs == 0)
           timeout = 10000;
         else
-          timeout = goal->frequencies.size() * 250;
+          timeout = goal->frequencies.size() * 450;
         eloop_register_timeout(timeout / 1000, 1000 * (timeout % 1000), scanTimeoutHandler, wpa_s_, NULL);
         wpa_supplicant_trigger_scan(wpa_s_, &wpa_req);
       }
@@ -750,10 +768,10 @@ void ros_assoc_failed(wpa_supplicant *wpa_s, const u8 *bssid, const char *reason
     wpa_s->ros_api->assocFailed(bssid, reason);
 }
 
-void ros_assoc_success(wpa_supplicant *wpa_s, const u8 *bssid)
+void ros_assoc_success(wpa_supplicant *wpa_s)
 {
   if (wpa_s->ros_api)
-    wpa_s->ros_api->assocSucceeded(bssid);
+    wpa_s->ros_api->assocSucceeded();
 }
 
 } // extern "C"

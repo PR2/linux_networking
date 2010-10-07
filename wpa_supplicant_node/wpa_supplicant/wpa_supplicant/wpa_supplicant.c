@@ -532,8 +532,10 @@ void wpa_supplicant_set_state(struct wpa_supplicant *wpa_s,
 	if (state != WPA_SCANNING)
 		wpa_supplicant_notify_scanning(wpa_s, 0);
 
+        if (state == WPA_COMPLETED)
+          ros_assoc_success(wpa_s);
+
 	if (state == WPA_COMPLETED && wpa_s->new_connection) {
-                ros_assoc_success(wpa_s, wpa_s->bssid);
 #if defined(CONFIG_CTRL_IFACE) || !defined(CONFIG_NO_STDOUT_DEBUG)
 		struct wpa_ssid *ssid = wpa_s->current_ssid;
 		wpa_msg(wpa_s, MSG_INFO, WPA_EVENT_CONNECTED "- Connection to "
