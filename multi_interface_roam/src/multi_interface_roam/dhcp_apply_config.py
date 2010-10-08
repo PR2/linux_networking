@@ -42,7 +42,7 @@ class DhcpAddressSetter(_DhcpSetterCommon):
 
     @inlineCallbacks
     def _locked_cb(self, old_state, new_state):
-        #print "Address", new_state
+        #print "Address", self.iface, new_state
         if new_state is None or old_state is not None:
             if self._iface_status_pub.get() >= IFSTATE.PLUGGED:
                 yield system.system('ifconfig', self.iface, '0.0.0.0')

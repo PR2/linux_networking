@@ -41,10 +41,10 @@ class Interface:
 class DhcpInterface(Interface):
     def __init__(self, iface, tableid):
         Interface.__init__(self, iface, tableid, iface)
-        interface_upper.InterfaceUpper(iface)
-        dhcpdata = dhcp.dhcp_client(iface)
-        DhcpAddressSetter(iface, dhcpdata.binding_publisher)
-        DhcpRouteSetter(iface, tableid, dhcpdata.binding_publisher)
+        self.interface_upper = interface_upper.InterfaceUpper(iface)
+        self.dhcpdata = dhcp.dhcp_client(iface)
+        DhcpAddressSetter(iface, self.dhcpdata.binding_publisher)
+        DhcpRouteSetter(iface, tableid, self.dhcpdata.binding_publisher)
         
         # FIXME RPFilter somewhere.
         # Flush ip rule on interface up somewhere.
@@ -61,10 +61,10 @@ class WiredInterface(DhcpInterface):
 class WirelessInterface(DhcpInterface):
     def __init__(self, iface, tableid):
         DhcpInterface.__init__(self, iface, tableid)
-        self.active = False
         self.wifi = pythonwifi.iwlibs.Wireless(iface)
         self.iwinfo = pythonwifi.iwlibs.WirelessInfo(iface)
         self.radio_sm = radio_sm.radio_sm(iface)
+        self.ping_monitor = ping_tester.PingMonitor(self)
 
     def _update_specialized(self):
         has_link = self.status > IFSTATE.LINK_ADDR 

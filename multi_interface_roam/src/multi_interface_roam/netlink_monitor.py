@@ -61,8 +61,12 @@ class NetlinkMonitor(command_with_output.CommandWithOutput):
         pubs =  self.raw_state_publishers[level]
         if not interface in pubs:
             pubs[interface] = state_publisher.StatePublisher(False)
+            #pubs[interface].subscribe(self.debug_print, interface, level)
         return pubs[interface]
-     
+
+    def debug_print(self, interface, level, old_state, new_state):
+        print "Netlink transition", interface, level, "from", old_state, "to", new_state
+
     def get_status_publisher(self, interface):
         if not interface in self.status_publishers:
             def lowest_nonzero(args):

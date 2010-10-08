@@ -57,18 +57,28 @@ class InterfaceSelector:
         self.tun_ip_rules = [ip_rule.IpRule(RULEID.TUNNEL+i) for i in range(len(self.interfaces))]
         
         # Set up periodic updates, and run the first one.
+        self.shutting_down = False
         self._periodic_update()
+        reactor.addSystemEventTrigger('before', 'shutdown', self._shutdown)
+
+    def _shutdown(self):
+        self.shut_down = True
 
     def set_mode(self, ssid = "", bssid = "", sel_interface = "", use_tunnel = True, band = 3):
         self.radio_manager.set_mode(ssid, bssid, band)
 
     def _periodic_update(self):
+        if self.shutting_down:
+            return
         self.periodic_update_handle = reactor.callLater(self.update_interval, self._periodic_update)
         
         # Update all the interfaces.
         for iface in self.interfaces.values():
             iface.update(self.update_interval)
         
+        # Update the radio manager
+        self.radio_manager.update()
+
         # Rank the interfaces.
         self.rank_interfaces()
 
@@ -120,5 +130,6 @@ class InterfaceSelector:
         for rank, iface in enumerate(interfaces):
             # FIXME
             iface.timeout_time = now
-            print "#% 2i %10.10s %7.1f %6.3f %17.17s %7.3f %3.0f"% \
-                    (rank, iface.name, (iface.timeout_time - now), iface.score, iface.bssid, iface.goodness, iface.reliability)
+            active = "active" if iface.active else ""
+            print "#% 2i %10.10s %7.1f %7.3f %17.17s %7.3f %3.0f %s"% \
+                    (rank, iface.name, (iface.timeout_time - now), iface.score, iface.bssid, iface.goodness, iface.reliability, active)

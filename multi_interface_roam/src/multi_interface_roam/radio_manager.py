@@ -48,8 +48,6 @@ class FrequencyList:
         self.frequencies = {}
         self.bands = 0
         self.scan_period_cold = config.get_parameter('scan_period_cold', 10)
-        self.scan_period_warm = config.get_parameter('scan_period_warm', 5)
-        self.scan_period_hot = config.get_parameter('scan_period_hot', 2)
         self.scan_reschedule_delay = config.get_parameter('scan_reschedule_delay', 2)
         self.scan_period_randomness = config.get_parameter('scan_period_randomness', 0)
         self.min_scan_interval = config.get_parameter('min_scan_interval', 1)
@@ -133,13 +131,23 @@ class Bss:
         assert bss.bssid == self.bssid
         if self.frequency != bss.frequency:
             print "Frequency for bss %s, %s has changed from %i to %i MHz."%(mac_addr.packed_to_str(bss.bssid), bss.ssid, self.frequency, bss.frequency) # FIXME
+        self.frequency = bss.frequency
         self.by_iface[iface] = bss
 
-    def last_seen(self, iface):
+    def last_seen(self, iface = None):
+        if iface is None:
+            return max(bss.stamp.to_sec() for bss in self.by_iface.itervalues())
         if iface in self.by_iface:
             return self.by_iface[iface].stamp.to_sec()
         else:
             return 0
+
+    def desirability(self, expiry_time):
+        desirabilities = [bss.level for bss in self.by_iface.itervalues() if bss.stamp.to_sec() > expiry_time]
+        if desirabilities:
+            return min(desirabilities)
+        else:
+            return -1e1000
 
 class BssList:
     def __init__(self, freq_list):
@@ -268,14 +276,21 @@ class RadioManager:
         self.scan_manager = ScanManager()
         self.initial_inhibit_end = time.time() + config.get_parameter('initial_assoc_inhibit', 5)
         self.bss_expiry_time = config.get_parameter('bss_expiry_time', 5)
-        self.scan_manager.new_scan_data.subscribe_repeating(self._new_scan_data)
+        self.active_bonus = config.get_parameter('active_bonus', 20)
+        self.max_hot_frequencies = config.get_parameter('max_hot_frequencies', 3)
+        self.scan_period_warm = config.get_parameter('scan_period_warm', 10)
+        self.scan_period_hot = config.get_parameter('scan_period_hot', 4)
         self.interfaces = set()
+        self.scan_manager.new_scan_data.subscribe_repeating(self._new_scan_data)
+        self.hot_bss_expiry_time = config.get_parameter('hot_bss_expiry_time', 5)
+        self.warm_bss_expiry_time = config.get_parameter('warm_bss_expiry_time', 3 * self.scan_period_warm)
 
     def add_iface(self, iface):
         self.scan_manager.add_iface(iface)
         self.interfaces.add(iface)
         iface.radio_sm.associated.subscribe(self._associated_cb, iface)
-
+        iface.dhcpdata.error_event.subscribe_repeating(self._dhcp_fail, iface)
+    
     def set_mode(self, ssid, bssid, band):
         self.forced_ssid = ssid
         self.forced_bssid = bssid
@@ -290,7 +305,7 @@ class RadioManager:
 
     def _check_cur_bss(self, iface):
         """Makes sure that the current bss satisfies forcing constraints."""
-        print "_check_cur_bss"
+        #print "_check_cur_bss"
         cur_bss = iface.radio_sm.associated.get()
         if not cur_bss:
             return
@@ -340,7 +355,74 @@ class RadioManager:
                 print "associating", iface.name, "to", mac_addr.packed_to_str(best_bss.bssid), best_bss.ssid, cur_assoc
                 iface.radio_sm.associate_request.trigger(best_bss.id)
 
+    def _dhcp_fail(self, iface):
+        iface.interface_upper.restart()
 
+    def _ping_fail():
+        pass
 
+    def update(self):
+        """Called in the main update cycle after all the scores have been
+        computed. Decides which interfaces should be activated."""
+
+        def iface_score(iface):
+            """Used to decide what to activate and disactivate."""
+            return iface.prescore
+
+        now = time.time()
         
+        active = set()
+        verified = set()
+        for iface in self.interfaces:
+            iface.active = iface.radio_sm.is_active.get()
+            if iface.active:
+                active.add(iface)
+            if iface.ping_monitor.is_verified.get():
+                verified.add(iface)
+        inactive_verified = verified - active
+
+        # Only keep one active interface.
+        if active:
+            best_active = min(active, key = iface_score)
+        else:
+            best_active = None
+        if len(active) > 1:
+            for iface in active:
+                if iface != best_active:
+                    iface.radio_sm.activate_request.set(False)
+
+        # Activate a verified interface if it is better than the current
+        # active interface.
+        if inactive_verified:
+            best_inactive_verified = max(inactive_verified, key = iface_score)
+            if not best_active or iface_score(best_inactive_verified) > iface_score(best_active) + self.active_bonus:
+                best_inactive_verified.radio_sm.activate_request.set(True)
+
+        # Keep a closer watch on the most relevant frequencies.
+        candidate_bsses = filter(lambda bss: bss.last_seen(iface) > now - self.warm_bss_expiry_time, 
+                self.scan_manager.bss_list.bsses.itervalues())
+        candidate_bsses = filter(self.check_bss_matches_forcing, candidate_bsses)
+        expiry_time = now - self.hot_bss_expiry_time
+        candidate_bsses.sort(key = lambda bss: bss.desirability(expiry_time), reverse = True)
+        periods = dict((f, self.scan_manager.frequencies.scan_period_cold) 
+                for f in self.scan_manager.frequencies.frequencies)
+        hot_frequencies = 0
+        print "Candidate bsses:"
+        for bss in candidate_bsses:
+            print bss.ssid, mac_addr.packed_to_str(bss.bssid), bss.frequency, bss.desirability(expiry_time), now - bss.last_seen()
+            if hot_frequencies < self.max_hot_frequencies and periods[bss.frequency] != self.scan_period_hot:
+                hot_frequencies += 1
+                p = self.scan_period_hot
+            else:
+                p = self.scan_period_warm
+            periods[bss.frequency] = min(periods[bss.frequency], p)
+        print "Frequencies"
+        #for f in self.scan_manager.frequencies.frequencies:
+        freqs = [ f for f in self.scan_manager.frequencies.frequencies if check_band(f, self.forced_band) ]
+        freqs.sort()
+        for f in freqs:
+            print f, periods[f], self.scan_manager.frequencies.frequencies[f].next_scan_time - now
+            self.scan_manager.frequencies.set_freq_period(f, periods[f])
+
+
 

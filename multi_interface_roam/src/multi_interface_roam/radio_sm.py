@@ -15,6 +15,7 @@ class RadioSmData:
         self.iface_name = iface_name
         self._up_state_pub = netlink_monitor.get_state_publisher(iface_name, IFSTATE.UP)
         self.activate_request = state_publisher.StatePublisher(False)
+        self.is_active = state_publisher.StatePublisher(False)
         self.scanning_enabled = state_publisher.StatePublisher(False)
         self.associate_request = event.Event()
         self.disactivate_delay = 1
@@ -87,10 +88,7 @@ class Associating(RadioSmState):
                 async_helpers.StateCondition(ud.radio._up_state_pub, operator.__not__ ),
                 async_helpers.StateCondition(ud.radio._radio.associated, lambda x: x != radio.Associating))
 
-        if 0 in events:
-            returnValue('down')
-
-        elif ud.radio.associated.get() == radio.Unassociated:
+        if 0 in events or ud.radio.associated.get() == radio.Unassociated:
             returnValue('failed')
         else:
             #print "Associated", ud.radio.iface_name, ud.radio.associated.get()
@@ -131,9 +129,9 @@ class Active(RadioSmState):
         events = yield async_helpers.select(
           async_helpers.StateCondition(ud.radio.activate_request, operator.__not__),
           async_helpers.StateCondition(ud.radio.associated, operator.__not__))
-        if 1 in events:
-            returnValue('unassociated')
-        returnValue('disactivate')
+        if 0 in events:
+            returnValue('disactivate')
+        returnValue('unassociated')
 
 class Disactivating(RadioSmState):
     def __init__(self):
@@ -145,11 +143,14 @@ class Disactivating(RadioSmState):
           async_helpers.Timeout(ud.radio.disactivate_delay),
           async_helpers.StateCondition(ud.radio.activate_request, operator.truth),
           async_helpers.StateCondition(ud.radio.associated, operator.__not__))
-        if 2 in events:
-            returnValue('unassociated')
         if 1 in events:
             returnValue('activate')
+        if 2 in events:
+            returnValue('unassociated')
         returnValue('done')
+
+def _state_change_cb(ud, states):
+    ud.radio.is_active.set("ACTIVE" in states)
 
 def radio_sm(iface):
     sm = smach.StateMachine(outcomes=[], input_keys=['radio'])
@@ -161,8 +162,8 @@ def radio_sm(iface):
         smadd('ASSOCIATED', Associated(), transitions = { 'reassociate' : 'ASSOCIATING', 'activate' : 'ACTIVE', 'unassociated' : 'DOWN'})
         smadd('ACTIVE', Active(), transitions = { 'disactivate' : 'DISACTIVATING', 'unassociated' : 'DOWN'} )
         smadd('DISACTIVATING', Disactivating(), transitions = { 'done' : 'ASSOCIATED', 'activate' : 'ACTIVE', 'unassociated' : 'DOWN'} )
-
     ud = smach.UserData()
     ud.radio = RadioSmData(iface)
+    sm.register_transition_cb(_state_change_cb)
     sm.execute_async(ud)
     return ud.radio
