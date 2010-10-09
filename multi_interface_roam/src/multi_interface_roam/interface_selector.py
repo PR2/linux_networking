@@ -9,6 +9,9 @@ import config
 import time
 import sys
 import radio_manager
+import logging_config
+
+summary_logger = logging_config.get_logger_stream_for_file('console.summary')
 
 class RULEID:
     LOCAL=100
@@ -125,11 +128,11 @@ class InterfaceSelector:
 
         # Print active_iface status
         now = time.time()
-        print
-        print time.ctime(now), now
+        print >> summary_logger
+        print >> summary_logger, time.ctime(now), now
         for rank, iface in enumerate(interfaces):
             # FIXME
             iface.timeout_time = now
             active = "active" if iface.active else ""
-            print "#% 2i %10.10s %7.1f %7.3f %17.17s %7.3f %3.0f %s"% \
+            print >> summary_logger, "#% 2i %10.10s %7.1f %7.3f %17.17s %7.3f %3.0f %s"% \
                     (rank, iface.name, (iface.timeout_time - now), iface.score, iface.bssid, iface.goodness, iface.reliability, active)

@@ -9,6 +9,7 @@ from netlink_monitor import netlink_monitor, IFSTATE
 import radio_sm
 import traceback
 import pythonwifi.iwlibs
+import mac_addr
 
 class Interface:
     def __init__(self, iface, tableid, name):
@@ -79,7 +80,7 @@ class WirelessInterface(DhcpInterface):
             self.essid = "###ERROR-COLLECTING-DATA###"
 
         try:
-            self.bssid = self.wifi.getAPaddr()
+            self.bssid = mac_addr.pretty(self.wifi.getAPaddr())
             self.diags.append(('BSSID', self.bssid))
         except Exception, e:
             if has_link:

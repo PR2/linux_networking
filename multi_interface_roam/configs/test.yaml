@@ -1,0 +1,19 @@
+redirect_console: True
+wireless_namespace: 'ddwrt'
+wpa_config: "/etc/ros/wifi/networks.conf" 
+#base_station: "10.0.128.10"
+#ping_port: 6868
+base_station: "prbase7"
+ping_port: 1194
+tunnel_interface: 'tun9'
+local_networks: [ '10.0.0.0/21' ]
+reliability_threshold: 50
+scan_period_cold: 20
+ssid: willow
+interfaces:
+  eth1: { type: wired, priority: 100 }
+  wlan0: { type: wireless }
+  wlan1: { type: wireless }
+#  wan0: { type: wired,  priority: 20 }
+#  "basestation-local2@lan1": { type: static, name: bs@lan1, priority: 30 }
+#  "wifi-router@lan0": { type: static, name: ddwrt }
