@@ -294,6 +294,9 @@ class RadioManager:
         self.scan_period_hot = config.get_parameter('scan_period_hot', 4)
         self.reassociate_hysteresis = config.get_parameter('reassociate_hysteresis', 10)
         self.interfaces = set()
+
+        self.set_mode() # Initializes some variables
+        
         self.scan_manager.new_scan_data.subscribe_repeating(self._new_scan_data)
         self.hot_bss_expiry_time = config.get_parameter('hot_bss_expiry_time', 5)
         self.warm_bss_expiry_time = config.get_parameter('warm_bss_expiry_time', 3 * self.scan_period_warm)
@@ -304,7 +307,7 @@ class RadioManager:
         iface.radio_sm.associated.subscribe(self._associated_cb, iface)
         iface.dhcpdata.error_event.subscribe_repeating(self._dhcp_fail, iface)
     
-    def set_mode(self, ssid, bssid, band):
+    def set_mode(self, ssid="", bssid="", band=0):
         self.forced_ssid = ssid
         self.forced_bssid = bssid
         self.forced_band = band
@@ -340,8 +343,8 @@ class RadioManager:
 
     def _new_scan_data(self):
         #print "_new_scan_data"
-        print "\033[2J"
-        print "\033[0;0H"
+        #print "\033[2J"
+        #print "\033[0;0H"
         now = time.time()
         if now < self.initial_inhibit_end:
             #print "inhibited"
@@ -445,10 +448,9 @@ class RadioManager:
 
         # Keep a closer watch on the most relevant frequencies.
         #print self.scan_manager.bss_list.bsses
-        candidate_bsses = filter(lambda bss: bss.last_seen(iface) > now - self.warm_bss_expiry_time, 
-                self.scan_manager.bss_list.bsses.itervalues())
         #print [candidate_bsses]
-        candidate_bsses = filter(self.check_bss_matches_forcing, candidate_bsses)
+        candidate_bsses = filter(self.check_bss_matches_forcing, 
+                self.scan_manager.bss_list.bsses.itervalues())
         expiry_time = now - self.hot_bss_expiry_time
         candidate_bsses.sort(key = lambda bss: bss.desirability(expiry_time), reverse = True)
         #print [candidate_bsses]
@@ -461,7 +463,7 @@ class RadioManager:
             if hot_frequencies < self.max_hot_frequencies and periods[bss.frequency] != self.scan_period_hot:
                 hot_frequencies += 1
                 p = self.scan_period_hot
-            else:
+            elif bss.last_seen(iface) > now - self.warm_bss_expiry_time:
                 p = self.scan_period_warm
             periods[bss.frequency] = min(periods[bss.frequency], p)
         print >> scan_periods_log, "Frequencies"

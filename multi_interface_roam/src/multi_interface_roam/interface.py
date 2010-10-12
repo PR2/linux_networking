@@ -66,16 +66,20 @@ class WirelessInterface(DhcpInterface):
         self.iwinfo = pythonwifi.iwlibs.WirelessInfo(iface)
         self.radio_sm = radio_sm.radio_sm(iface)
         self.ping_monitor = ping_tester.PingMonitor(self)
+        self.had_exception_last_time = False
 
     def _update_specialized(self):
-        has_link = self.status > IFSTATE.LINK_ADDR 
+        has_link = self.status > IFSTATE.LINK_ADDR
+        had_exception_this_time = False
         try:
             self.essid = self.wifi.getEssid()
             self.diags.append(('ESSID', self.essid))
         except Exception, e:
             if has_link:
-                traceback.print_exc(10)
-                print
+                had_exception_this_time = True
+                if self.had_exception_last_time:
+                    traceback.print_exc(10)
+                    print
             self.diags.append(('ESSID', 'Error collecting data.'))
             self.essid = "###ERROR-COLLECTING-DATA###"
 
@@ -84,8 +88,10 @@ class WirelessInterface(DhcpInterface):
             self.diags.append(('BSSID', self.bssid))
         except Exception, e:
             if has_link:
-                traceback.print_exc(10)
-                print
+                had_exception_this_time = True
+                if self.had_exception_last_time:
+                    traceback.print_exc(10)
+                    print
             self.bssid = "00:00:00:00:00:00"
             self.diags.append(('BSSID', 'Error collecting data.'))
 
@@ -95,8 +101,10 @@ class WirelessInterface(DhcpInterface):
             self.wifi_txpower = "%.1f mW"%self.wifi_txpower
         except Exception, e:
             if str(e).find("Operation not supported") == -1 and has_link:
-                traceback.print_exc(10)
-                print
+                had_exception_this_time = True
+                if self.had_exception_last_time:
+                    traceback.print_exc(10)
+                    print
             self.diags.append(('TX Power (mW)', 'Error collecting data.'))
             self.wifi_txpower = "unknown" 
 
@@ -105,8 +113,10 @@ class WirelessInterface(DhcpInterface):
             self.diags.append(('Frequency (Gz)', "%.4f"%(self.wifi_frequency/1e9)))
         except Exception, e:
             if has_link:
-                traceback.print_exc(10)
-                print
+                had_exception_this_time = True
+                if self.had_exception_last_time:
+                    traceback.print_exc(10)
+                    print
             self.wifi_frequency = 0
             self.diags.append(('Frequency', 'Error collecting data.'))
 
@@ -162,6 +172,8 @@ class WirelessInterface(DhcpInterface):
             else:
                 self.diags.append(('TX Rate (Mbps)', 'Unknown'))
             self.wifi_rate = "Unknown"
+
+        self.had_exception_last_time = had_exception_this_time
         
 class StaticRouteInterface(Interface):
     pass

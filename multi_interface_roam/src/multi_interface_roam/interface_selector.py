@@ -10,6 +10,10 @@ import time
 import sys
 import radio_manager
 import logging_config
+import socket
+import system
+from netlink_monitor import netlink_monitor, IFSTATE
+from async_helpers import mainThreadCallback
 
 summary_logger = logging_config.get_logger_stream_for_file('console.summary')
 
@@ -28,11 +32,27 @@ class InterfaceSelector:
         self.update_interval = 1
         self.radio_manager = radio_manager.RadioManager()
         self.inactive_penalty = config.get_parameter('inactive_penalty', 50)
+        self.forced_interface = ""
+        self.use_tunnel = True
+        self.tunnel_interface = config.get_parameter('tunnel_interface', "")
+
+        print "Resulving basestation IP. (Blocking operation.)"
+        self.basestation_ip = socket.gethostbyname(config.get_parameter('base_station'))
 
         # Add rules to guarantee that local routes go to the main table.
         local_net_rule = ip_rule.IpRule(RULEID.LOCAL)
         for subnet in config.get_parameter('local_networks'):
             local_net_rule.add('to', subnet, 'lookup', 'main')
+
+        # Add a rule to send through the vpn.
+        if self.tunnel_interface:
+            self.vpn_rule = ip_rule.IpRule(RULEID.DEFAULT)
+            # Use LINK here because netlink_monitor's parsing rules don't
+            # currently work on vpn interfaces.
+            system.system('ip', 'route', 'flush', 'table', str(RULEID.DEFAULT))
+            netlink_monitor.get_state_publisher(self.tunnel_interface,
+                    IFSTATE.LINK).subscribe(self._refresh_default_route)
+
 
         # Create all the interfaces.
         interface_names = config.get_parameter('interfaces').keys()
@@ -67,8 +87,19 @@ class InterfaceSelector:
     def _shutdown(self):
         self.shut_down = True
 
+    @mainThreadCallback
     def set_mode(self, ssid = "", bssid = "", sel_interface = "", use_tunnel = True, band = 3):
         self.radio_manager.set_mode(ssid, bssid, band)
+        self.forced_interface = sel_interface
+        self.use_tunnel = use_tunnel
+        if use_tunnel:
+            self.vpn_rule.set('lookup', str(RULEID.DEFAULT))
+        else:
+            self.vpn_rule.set()
+
+    def _refresh_default_route(self, old_state, new_state):
+        if new_state:
+            system.system('ip', 'route', 'replace', 'table', str(RULEID.DEFAULT), 'default', "dev", self.tunnel_interface)
 
     def _periodic_update(self):
         if self.shutting_down:
@@ -92,7 +123,10 @@ class InterfaceSelector:
     def set_tun_rules(self, selected_interfaces):
         # Set the interfaces we are given in order.
         for i, iface in enumerate(selected_interfaces):
-            self.tun_ip_rules[i].set('lookup', iface.tableid)
+            if self.use_tunnel:
+                self.tun_ip_rules[i].set('to', self.basestation_ip, 'lookup', iface.tableid)
+            else:
+                self.tun_ip_rules[i].set('lookup', iface.tableid)
 
         # Clear the remaining rules.
         for tir in self.tun_ip_rules[len(selected_interfaces):]:
@@ -109,10 +143,16 @@ class InterfaceSelector:
             iface.prescore = iface.score = InterfaceSelector.TERRIBLE_INTERFACE
             return
 
+        # If the interface an interface is being forced, other interfaces
+        # should all have terrible scores.
+        if self.forced_interface and self.forced_interface != iface.iface:
+            iface.prescore = iface.score = InterfaceSelector.TERRIBLE_INTERFACE
+            return
+
         iface.prescore = iface.score = iface.goodness + iface.reliability + iface.priority
         if not iface.active:
             iface.score -= self.inactive_penalty
-
+        
     def rank_interfaces(self):        
         # Score interfaces
         interfaces = self.interfaces.values()
@@ -130,9 +170,11 @@ class InterfaceSelector:
         now = time.time()
         print >> summary_logger
         print >> summary_logger, time.ctime(now), now
+        print >> summary_logger, netlink_monitor.get_status_publisher(self.tunnel_interface).get()
         for rank, iface in enumerate(interfaces):
             # FIXME
             iface.timeout_time = now
             active = "active" if iface.active else ""
-            print >> summary_logger, "#% 2i %10.10s %7.1f %7.3f %17.17s %7.3f %3.0f %s"% \
-                    (rank, iface.name, (iface.timeout_time - now), iface.score, iface.bssid, iface.goodness, iface.reliability, active)
+            rule = "rule  " if iface in active_interfaces else "norule"
+            print >> summary_logger, "#% 2i %10.10s %7.1f %7.3f %17.17s %7.3f %3.0f %s %s"% \
+                    (rank, iface.name, (iface.timeout_time - now), iface.score, iface.bssid, iface.goodness, iface.reliability, rule, active)
