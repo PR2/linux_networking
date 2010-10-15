@@ -10,13 +10,17 @@ import radio_sm
 import traceback
 import pythonwifi.iwlibs
 import mac_addr
+import socket
+import state_publisher
+import ipaddr
 
 class Interface:
-    def __init__(self, iface, tableid, name):
+    def __init__(self, iface, tableid, cfgname):
         self.iface = iface
-        self.name = name
+        self.cfgname = cfgname
+        self.prettyname = config.get_interface_parameter(self.cfgname, 'name', self.cfgname)
         self.active = True
-        self.priority = config.get_interface_parameter(iface, 'priority', 0)
+        self.priority = config.get_interface_parameter(self.cfgname, 'priority', 0)
         src_rule_setter = DhcpSourceRuleSetter(iface, tableid, tableid)
         self.tableid = str(tableid)
         base_station = config.get_parameter('base_station')
@@ -25,7 +29,7 @@ class Interface:
 
     def update(self, interval):
         self.diags = []
-        self.status = netlink_monitor.get_status_publisher(self.name).get()
+        self.status = netlink_monitor.get_status_publisher(self.iface).get()
        
         self._update_specialized()
 
@@ -49,7 +53,6 @@ class DhcpInterface(Interface):
         
         # FIXME RPFilter somewhere.
         # Flush ip rule on interface up somewhere.
-        # Set ip rule for ping somewhere.
 
 class WiredInterface(DhcpInterface):
     def __init__(self, iface, tableid):
@@ -57,7 +60,7 @@ class WiredInterface(DhcpInterface):
 
     def _update_specialized(self):
         self.reliability = 100
-        self.bssid = "NoLink"
+        self.bssid = "Wired"
 
 class WirelessInterface(DhcpInterface):
     def __init__(self, iface, tableid):
@@ -139,7 +142,7 @@ class WirelessInterface(DhcpInterface):
                 print "Error getting wireless stats on interface %s: %s"%(self.iface, str(e))
         
         if not got_stats:
-            #print self.name, "could not collect wireless data", e
+            #print self.prettyname, "could not collect wireless data", e
             print
             self.reliability = 0
             self.wifi_quality = -1
@@ -176,7 +179,27 @@ class WirelessInterface(DhcpInterface):
         self.had_exception_last_time = had_exception_this_time
         
 class StaticRouteInterface(Interface):
-    pass
+    def __init__(self, route, tableid):
+        gateway, iface = route.split('@')
+        Interface.__init__(self, iface, tableid, route)
+        self.gateway = socket.gethostbyname(gateway)
+        self._fake_binding = state_publisher.StatePublisher(None)
+        netlink_monitor.get_state_publisher(iface, IFSTATE.ADDR).subscribe(self._publish_binding)
+        DhcpRouteSetter(iface, tableid, self._fake_binding)
+
+    def _publish_binding(self, old_state, new_state):
+        if new_state:
+            ip, netbits = new_state
+            net = ipaddr.IPv4Network("%s/%s"%(ip, netbits))
+            self._binding = { "ip" : ip, "gateway" : self.gateway, "network_slashed" : "%s/%s"%(net.network, net.prefixlen) }
+            self._fake_binding.set(self._binding)
+        else:
+            self._fake_binding.set(None)
+    
+    def _update_specialized(self):
+        self.reliability = 100
+        self.bssid = "Wired"
+
 
 class NoType(Exception):
     pass

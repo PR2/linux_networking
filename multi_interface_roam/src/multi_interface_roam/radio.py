@@ -42,7 +42,7 @@ def is_not_associating(state):
 class Radio:
     def __init__(self, interface_name):
         self.interface_name = interface_name
-        self.associated = state_publisher.StatePublisher(False)
+        self.associated = state_publisher.StatePublisher(Unassociated)
         self.frequency_list = state_publisher.StatePublisher([])
         self.network_list = state_publisher.StatePublisher([])
         self.scan_results_event = event.Event()

@@ -36,7 +36,7 @@ class InterfaceSelector:
         self.use_tunnel = True
         self.tunnel_interface = config.get_parameter('tunnel_interface', "")
 
-        print "Resulving basestation IP. (Blocking operation.)"
+        print "Resolving basestation IP. (Blocking operation.)"
         self.basestation_ip = socket.gethostbyname(config.get_parameter('base_station'))
 
         # Add rules to guarantee that local routes go to the main table.
@@ -89,6 +89,7 @@ class InterfaceSelector:
 
     @mainThreadCallback
     def set_mode(self, ssid = "", bssid = "", sel_interface = "", use_tunnel = True, band = 3):
+        self.goodness_weight = config.get_parameter('ping_weighting', 0.5)
         self.radio_manager.set_mode(ssid, bssid, band)
         self.forced_interface = sel_interface
         self.use_tunnel = use_tunnel
@@ -149,7 +150,7 @@ class InterfaceSelector:
             iface.prescore = iface.score = InterfaceSelector.TERRIBLE_INTERFACE
             return
 
-        iface.prescore = iface.score = iface.goodness + iface.reliability + iface.priority
+        iface.prescore = iface.score = self.goodness_weight * iface.goodness + (1 - self.goodness_weight) * iface.reliability + iface.priority
         if not iface.active:
             iface.score -= self.inactive_penalty
         
@@ -170,11 +171,11 @@ class InterfaceSelector:
         now = time.time()
         print >> summary_logger
         print >> summary_logger, time.ctime(now), now
-        print >> summary_logger, netlink_monitor.get_status_publisher(self.tunnel_interface).get()
+        #print >> summary_logger, netlink_monitor.get_status_publisher(self.tunnel_interface).get()
         for rank, iface in enumerate(interfaces):
             # FIXME
             iface.timeout_time = now
             active = "active" if iface.active else ""
             rule = "rule  " if iface in active_interfaces else "norule"
             print >> summary_logger, "#% 2i %10.10s %7.1f %7.3f %17.17s %7.3f %3.0f %s %s"% \
-                    (rank, iface.name, (iface.timeout_time - now), iface.score, iface.bssid, iface.goodness, iface.reliability, rule, active)
+                    (rank, iface.prettyname, (iface.timeout_time - now), iface.score, iface.bssid, iface.goodness, iface.reliability, rule, active)

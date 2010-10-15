@@ -69,7 +69,7 @@ def pretty(str):
     else:
         out = "Invalid MAC"
     
-    return out.ljust(24)[0:24]
+    return out
 
 if __name__ == "__main__":
     import unittest

@@ -13,6 +13,7 @@ import logging_config
 
 scan_periods_log = logging_config.get_logger_stream_for_file('scan_periods')
 known_bsses_log = logging_config.get_logger_stream_for_file('known_bsses')
+radio_manager_decisions = logging_config.get_logger_stream_for_file('console.radio_manager_decisions')
 
 def check_band(freq, bands):
     if freq < 3000 and bands & 1:
@@ -79,7 +80,7 @@ class FrequencyList:
         
         # If no frequency has expired, take into account when it was last seen by this interface.
         if freq.next_scan_time > now:
-            #print "Pondering frequencies that have not been updated recently on ", iface.name
+            #print "Pondering frequencies that have not been updated recently on ", iface.iface
             freq = min(active_freqs, key = lambda f: f.next_scan_time_by_iface.get(iface,0))
         
         earliest_scan_time = freq.do_not_retry_before.get(iface, 0)
@@ -177,9 +178,8 @@ class BssList:
             all = self.bsses.items()
             all.sort(key=lambda (x,y):(y.frequency, x))
             now = time.time()
-            print >> known_bsses_log
-            #print "\033[2J"
-            #print "\033[0;0H"
+            print >> known_bsses_log, "\033[2J\033[0;0H"
+            print >> known_bsses_log, "Known BSSes bsses:"
             for _, bss in all:
                 print >> known_bsses_log, mac_addr.pretty(bss.bssid), "%20.20s"%bss.ssid, bss.frequency,
                 ifaces = bss.by_iface.keys()
@@ -188,7 +188,7 @@ class BssList:
                 max_level = max(bss.by_iface.itervalues(), key = lambda bss: bss.level).level
                 print >> known_bsses_log, "%5.1f/%3i"%(min_stamp,max_level),
                 for iface in ifaces:
-                    print >> known_bsses_log, iface.name, "%5.1f/%3i"%(now - bss.by_iface[iface].stamp.to_sec(), bss.by_iface[iface].level),
+                    print >> known_bsses_log, iface.iface, "%5.1f/%3i"%(now - bss.by_iface[iface].stamp.to_sec(), bss.by_iface[iface].level),
                 print >> known_bsses_log 
             print >> known_bsses_log 
 
@@ -202,7 +202,7 @@ class BssList:
                     print >> known_bsses_log, f, "never",
                 print >> known_bsses_log, "%5.1f"%(fc.next_scan_time - now),
                 for iface in fc.next_scan_time_by_iface:
-                    print >> known_bsses_log, "%s %5.1f"%(iface.name, now - fc.next_scan_time_by_iface[iface]),
+                    print >> known_bsses_log, "%s %5.1f"%(iface.iface, now - fc.next_scan_time_by_iface[iface]),
                 print >> known_bsses_log
             print >> known_bsses_log
 
@@ -220,6 +220,7 @@ class ScanManager:
         # Subscribe to state changes that might cause us to trigger a scan.
         iface.radio_sm.scanning.subscribe(self._scanning_state_cb, iface)
         iface.radio_sm.associated.subscribe(self._scanning_state_cb, iface)
+        iface.radio_sm.associated.subscribe(self._log_associations, iface)
         iface.radio_sm.scanning_enabled.subscribe(self._scanning_state_cb, iface)
         
         # Subscribe to scan results
@@ -231,11 +232,21 @@ class ScanManager:
         """A state change that might cause us to start scanning has occurred."""
         self._trigger_scan(iface)
 
+    def _log_associations(self, iface, old_state, new_state):
+        if new_state:
+            print >> radio_manager_decisions, "--> Associated to %s on %s."%(mac_addr.pretty(new_state.bssid), iface.iface)
+        elif new_state == radio.Associating:
+            print >> radio_manager_decisions, "--> Associating on %s."%iface.iface
+        elif new_state == radio.Unassociated:
+            print >> radio_manager_decisions, "--> Unassociated on %s."%iface.iface
+        else: 
+            print >> radio_manager_decisions, "--> ERROR!! Unknown association state %s on %s."%(new_state, iface.iface)
+
     @inlineCallbacks
     def _trigger_scan(self, iface):
         #if iface.radio_sm.associated.get():
         #    async_helpers.async_sleep(0.1)
-        #print "_trigger_scan", iface.name 
+        #print "_trigger_scan", iface.iface 
         if iface in self.scheduled_scan:
             if self.scheduled_scan[iface].active():
                 self.scheduled_scan[iface].cancel()
@@ -254,14 +265,14 @@ class ScanManager:
         except NoFrequenciesReady, nfr:
             if nfr.next_time:
                 self.scheduled_scan[iface] = reactor.callLater(max(0.1, nfr.next_time - time.time()), self._trigger_scan, iface)
-                #print "No frequencies for ", iface.name, nfr.next_time - time.time()
+                #print "No frequencies for ", iface.iface, nfr.next_time - time.time()
             #else:
-                #print "No frequencies for", iface.name
+                #print "No frequencies for", iface.iface
         else:
-            print "Triggering scan", iface.name, freqs
+            print "Triggering scan", iface.iface, freqs
             rslt = yield iface.radio_sm.scan(freqs)
             if not rslt:
-                print "Scan failed", iface.name, freqs
+                print "Scan failed", iface.iface, freqs
                 yield async_helpers.async_sleep(self.failed_scan_delay)
                 self.frequencies.reschedule(iface, freqs)
 
@@ -292,7 +303,7 @@ class RadioManager:
         self.max_hot_frequencies = config.get_parameter('max_hot_frequencies', 3)
         self.scan_period_warm = config.get_parameter('scan_period_warm', 10)
         self.scan_period_hot = config.get_parameter('scan_period_hot', 4)
-        self.reassociate_hysteresis = config.get_parameter('reassociate_hysteresis', 10)
+        self.reassociate_hysteresis = config.get_parameter('reassociate_hysteresis', 5)
         self.interfaces = set()
 
         self.set_mode() # Initializes some variables
@@ -326,7 +337,7 @@ class RadioManager:
         if not cur_bss:
             return
         if not self.check_bss_matches_forcing(cur_bss):
-            print iface.name, "associated to", cur_bss.ssid, mac_addr.pretty(cur_bss.bssid), cur_bss.frequency
+            print iface.iface, "associated to", cur_bss.ssid, mac_addr.pretty(cur_bss.bssid), cur_bss.frequency
             print "but want", self.forced_ssid, self.forced_ssid, self.forced_band
             print "Unassociating because bss does not match requirements."
             iface.radio_sm.unassociate()
@@ -371,7 +382,8 @@ class RadioManager:
                     #print self.scan_manager.bss_list.bsses.values()
                     continue
 
-                print "Best bss:", mac_addr.pretty(best_bss.bssid)
+                best_desirability = best_bss.desirability(expiry_time, iface)
+                print "Best bss:", mac_addr.pretty(best_bss.bssid), best_desirability
 
                 if cur_assoc:
                     # Are we already associated to the best AP?
@@ -380,23 +392,24 @@ class RadioManager:
                         continue
 
                     # Compute desirability for current association.
-                    try:
-                        cur_bss = self.scan_manager.bss_list[make_id(cur_assoc)]
+                    cur_id = make_id(cur_assoc)
+                    if cur_id in self.scan_manager.bss_list.bsses:
+                        cur_bss = self.scan_manager.bss_list.bsses[make_id(cur_assoc)]
                         cur_desirability = cur_bss.desirability(expiry_time, iface)
-                    except:
+                    else:
                         cur_desirability = -1e1000
                     
                     # Is the best ap better enough than the current best?
-                    if cur_desirability + self.reassociate_hysteresis > best_bss.desirability(expiry_time, iface):
+                    if cur_desirability + self.reassociate_hysteresis > best_desirability:
                         print "Best bss not over hysteresis threshold: %s %f > %s %f"%(mac_addr.pretty(cur_assoc.bssid), cur_desirability, mac_addr.pretty(best_bss.bssid), best_bss.desirability())
                         continue
 
                 # Let's associate
-                print "associating", iface.name, "to", mac_addr.pretty(best_bss.bssid), best_bss.ssid, 
+                print >> radio_manager_decisions, "Associating to %s (%f) on %s"%(mac_addr.pretty(best_bss.bssid), best_desirability, iface.iface),
                 if cur_assoc:
-                    print "from", mac_addr.pretty(cur_assoc.bssid)
+                    print >> radio_manager_decisions, "from %s (%f)"%(mac_addr.pretty(cur_assoc.bssid), cur_desirability)
                 else:
-                    print "from unassociated"
+                    print >> radio_manager_decisions, "from unassociated"
                 iface.radio_sm.associate_request.trigger(best_bss.id)
 
     def _dhcp_fail(self, iface):
@@ -434,6 +447,7 @@ class RadioManager:
             for iface in active:
                 if iface != best_active:
                     iface.radio_sm.activate_request.set(False)
+                    print >> radio_manager_decisions, "XXX Disactivating %s because %s is active and better."%(iface.iface, best_active.iface)
 
         # Activate a verified interface if it is better than the current
         # active interface.
@@ -441,9 +455,9 @@ class RadioManager:
             best_inactive_verified = max(inactive_verified, key = iface_score)
             if not best_active or iface_score(best_inactive_verified) > iface_score(best_active) + self.active_bonus:
                 if not best_active:
-                    print "Activating because no best active"
+                    print >> radio_manager_decisions, "XXX Activating %s because no current best active."%best_inactive_verified.iface
                 else:
-                    print "Activating because", iface_score(best_inactive_verified), iface_score(best_active) + self.active_bonus
+                    print >> radio_manager_decisions, "XXX Activating %s because it is better than %s."%(best_inactive_verified.iface, best_active.iface)
                 best_inactive_verified.radio_sm.activate_request.set(True)
 
         # Keep a closer watch on the most relevant frequencies.
@@ -457,7 +471,8 @@ class RadioManager:
         periods = dict((f, self.scan_manager.frequencies.scan_period_cold) 
                 for f in self.scan_manager.frequencies.frequencies)
         hot_frequencies = 0
-        print >> scan_periods_log, "\nCandidate bsses:"
+        print >> scan_periods_log, "\033[2J\033[0;0H"
+        print >> scan_periods_log, "Candidate bsses:"
         for bss in candidate_bsses:
             print >> scan_periods_log, bss.ssid, mac_addr.pretty(bss.bssid), bss.frequency, bss.desirability(expiry_time), now - bss.last_seen()
             if hot_frequencies < self.max_hot_frequencies and periods[bss.frequency] != self.scan_period_hot:
