@@ -148,7 +148,7 @@ class MonitorClient:
                 pass
         #print "Udp monitor recv_thread finished shut down"
 
-    def get_smart_bins(self, window):
+    def get_statistics(self, window):
         bins = [0 for i in range(0,len(self.latencybins))]
         with self.mutex: 
             now = time.time()
@@ -162,19 +162,19 @@ class MonitorClient:
             print "Got exception", s
         window_end = now - self.latencybins[-2]
         window_start = self.window_start
-        average = 0.
+        sum_latency = 0.
         count = 0
-        average_restricted = 0.
+        sum_latency_restricted = 0.
         count_restricted = 0
         for pkt in arrived:
             (send_time, latency) = pkt
             if send_time < window_end:
                 bins[bisect.bisect(self.latencybins, latency)] += 1
                 count += 1
-                average += latency
+                sum_latency += latency
                 if send_time >= window_start:
                     count_restricted += 1
-                    average_restricted += latency
+                    sum_latency_restricted += latency
             else:
                 self.arrived.append(pkt)
         missed = 0
@@ -184,15 +184,68 @@ class MonitorClient:
                 self.lost += 1
             else:
                 self.outstanding[seq_num] = send_time
-        if count == 0:
-            count = 1
-        if count_restricted == 0:
-            count_restricted = 1
-        count = float(count)
-        count_restricted = float(count_restricted)
-        bins = [ val / (count_restricted + missed) for val in bins ]
         self.window_start = window_end
-        return bins, average / count, average_restricted / count_restricted
+        
+        return Statistics(count, count_restricted, missed, sum_latency, sum_latency_restricted, bins, window_start, window_end)
+
+    def get_smart_bins(self, window):
+        return self.get_statistics(window).get_smart_bins()
+
+class Statistics:
+    def __init__(self, count, count_restricted, missed, sum_latency, sum_latency_restricted, bins, window_start, window_end):
+        self.count = count
+        self.count_restricted = count_restricted
+        self.missed = missed
+        self.sum_latency = sum_latency
+        self.sum_latency_restricted = sum_latency_restricted
+        self.bins = bins
+        self.window_start = window_start
+        self.window_end = window_end
+
+    def get_percentage_bins(self):
+        denom = self.count_restricted + self.missed
+        if not denom: 
+            denom = 1 # bins will be all zero anyhow in this case.
+        denom = float(denom)
+        return [ val / (denom) for val in self.bins ]
+   
+    def get_average_latency(self):
+        if self.count: 
+            return self.sum_latency / float(self.count)
+        else:
+            return 0.0
+
+    def get_average_latency_restricted(self):
+        if self.count: 
+            return self.sum_latency_restricted / float(self.count_restricted)
+        else:
+            return 0.0
+
+    def get_smart_bins(self):
+        return self.get_percentage_bins(), self.get_average_latency(), self.get_average_latency_restricted()
+
+    def accumulate(self, extra_stats):
+        """Combines the stats from extra_stats into the existing stats.
+        Expects the time windows to be adjacent."""
+        if len(extra_stats.bins) != len(self.bins):
+            raise ValueError("Tried to merge Statistics with different bin sizes.")
+        
+        if extra_stats.window_end == self.window_start:
+            self.window_start = extra_stats.window_start
+        elif extra_stats.window_start == self.window_end:
+            self.window_end = extra_stats.window_end
+        else:
+            raise ValueError("Tried to accumulate non-adjacent Statistics.")
+                
+        for i in len(self.bins):
+            self.bins[i] += extra_stats.bins[i]
+
+        self.count += extra_stats.count
+        self.count_restricted += extra_stats.count_restricted
+        self.missed += extra_stats.missed
+        self.sum_latency += extra_stats.sum_latency
+        self.sum_latency_restricted += extra_stats.sum_latency_restricted
+        self.count += extra_stats.count
 
 if __name__ == "__main__":
     try:
