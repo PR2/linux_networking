@@ -4,6 +4,7 @@ import rospy
 import wpa_supplicant_node.msg as wpa_msgs
 import actionlib                       
 import state_publisher
+import mac_addr
 import event
 from twisted.internet.defer import Deferred
 from twisted.internet import reactor
@@ -87,7 +88,7 @@ class Radio:
 
     def associate(self, id):
         ssid = id[0]
-        bssid = id[1]
+        bssid = mac_addr.to_packed(id[1])
         self._associate_action.send_goal(wpa_msgs.AssociateGoal(ssid, bssid))
         self.associated.set(Associating)
 
