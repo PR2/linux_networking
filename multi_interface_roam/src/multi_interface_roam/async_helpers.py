@@ -28,21 +28,21 @@ def now():
     reactor.callLater(0, d.callback, None)
     return d
 
-def wait_for_state(state, condition):
+def wait_for_state(state, condition = None):
     d = Deferred()
     def cb(old_state, new_state):
         #print "wait_for_state, cb", old_state, new_state, condition 
-        if condition(new_state):
+        if condition is None or condition(new_state):
             #print "wait_for_state, cb, hit"
             d.callback(new_state)
             raise Unsubscribe
     state.subscribe(cb)
     return d
 
-def wait_for_event(event, condition):
+def wait_for_event(event, condition = None):
     d = Deferred()
     def cb(*args, **kwargs):
-        if condition(args, kwargs):
+        if condition is None or condition(args, kwargs):
             d.callback(*args, **kwargs)
             raise Unsubscribe
     event.subscribe_repeating(cb)
