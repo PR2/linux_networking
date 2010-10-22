@@ -2,8 +2,21 @@
 
 import re
 
+def same(s1, s2):
+    return to_packed(s1) == to_packed(s2)
+
 def is_packed(pk):
     return type(pk) == str and len(pk) == 6
+
+def to_packed(s):
+    if is_packed(s):
+        return s
+    return str_to_packed(s)
+
+def to_str(s):
+    if is_str(s):
+        return s
+    return packed_to_str(pk)
 
 def packed_to_str(pk):
     if is_packed(pk):
