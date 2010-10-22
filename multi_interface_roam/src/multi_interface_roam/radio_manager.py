@@ -299,7 +299,7 @@ class RadioManager:
         self.scan_manager = ScanManager()
         self.initial_inhibit_end = time.time() + config.get_parameter('initial_assoc_inhibit', 5)
         self.bss_expiry_time = config.get_parameter('bss_expiry_time', 5)
-        self.active_bonus = config.get_parameter('active_bonus', 20)
+        self.activate_hysteresis = config.get_parameter('activate_hysteresis', 5)
         self.max_hot_frequencies = config.get_parameter('max_hot_frequencies', 3)
         self.scan_period_warm = config.get_parameter('scan_period_warm', 10)
         self.scan_period_hot = config.get_parameter('scan_period_hot', 4)
@@ -452,8 +452,11 @@ class RadioManager:
         # Activate a verified interface if it is better than the current
         # active interface.
         if inactive_verified:
+            #print >> radio_manager_decisions, "Active interface selection."
+            #for iface in verified:
+            #    print >> radio_manager_decisions, iface.iface, iface_score(iface), iface in active
             best_inactive_verified = max(inactive_verified, key = iface_score)
-            if not best_active or iface_score(best_inactive_verified) > iface_score(best_active) + self.active_bonus:
+            if not best_active or iface_score(best_inactive_verified) > iface_score(best_active) + self.activate_hysteresis:
                 if not best_active:
                     print >> radio_manager_decisions, "XXX Activating %s because no current best active."%best_inactive_verified.iface
                 else:
