@@ -10,6 +10,9 @@ libreadline-dev:
     '9.10':  libreadline5-dev
     '9.04':  libreadline-dev
 
+beep:
+  ubuntu: beep
+
 scapy:
   ubuntu: python-scapy
 
