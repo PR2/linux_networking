@@ -140,7 +140,7 @@ class InterfaceSelector:
         # prescore is used by radio manager to decide which interface to
         # activate.
         
-        if iface.goodness <= 0:
+        if iface.goodness <= 0 and (self.forced_interface != iface.iface):
             iface.prescore = iface.score = InterfaceSelector.TERRIBLE_INTERFACE
             return
 
@@ -177,5 +177,5 @@ class InterfaceSelector:
             iface.timeout_time = now
             active = "active" if iface.active else ""
             rule = "rule  " if iface in active_interfaces else "norule"
-            print >> summary_logger, "#% 2i %10.10s %7.1f %7.3f %17.17s %7.3f %3.0f %s %s"% \
-                    (rank, iface.prettyname, (iface.timeout_time - now), iface.score, iface.bssid, iface.goodness, iface.reliability, rule, active)
+            print >> summary_logger, "#% 2i %10.10s %7.1f %7.3f %7.3f %17.17s %7.3f %3.0f %s %s"% \
+                    (rank, iface.prettyname, (iface.timeout_time - now), iface.score, iface.prescore, iface.bssid, iface.goodness, iface.reliability, rule, active)
