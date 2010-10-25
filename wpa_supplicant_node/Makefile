@@ -5,6 +5,8 @@ my_all:
 	make -C wpa_supplicant/wpa_supplicant libwpa_supplicant.so wpa_supplicant.pc
 	make all
 
+test: my_all
+
 clean: my_clean
 
 my_clean:
