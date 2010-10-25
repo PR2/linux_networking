@@ -56,8 +56,10 @@ public:
 
     ROS_INFO("doWork()");
     
-    boost::mutex::scoped_lock lock(mutex_);
-    mainThreadWait(lock);
+    {
+      boost::mutex::scoped_lock lock(mutex_);
+      mainThreadWait(lock);
+    }
 
     int bytes;
     do {
@@ -65,10 +67,17 @@ public:
       ROS_INFO("doWork read %i bytes from the dummy fifo.", bytes);
     } while (bytes == sizeof(buffer));
 
-    while (!work_queue_.empty())
-    {
-      work_queue_.front()();
-      work_queue_.pop();
+    while (1)
+    { 
+      WorkFunction work;
+      {
+        boost::mutex::scoped_lock lock(mutex_);
+        if (work_queue_.empty())
+          break;
+        work = work_queue_.front();
+        work_queue_.pop();
+      }
+      work();
     }
   }
 
@@ -276,19 +285,21 @@ public:
     if (active_association_ == null_associate_goal_handle_)
     {
       ROS_ERROR("Got disassociation with no active association on BSSID: " MACSTR " (%s)", MAC2STR(bssid), s);
-      lockedAssociateWork();
-      return;
     }
-    else if (os_memcmp(bssid, &active_association_.getGoal()->bssid, ETH_ALEN) &&
-        !is_zero_ether_addr(bssid))
+    else
     {
-      ROS_ERROR("Got disassociation on unexpected BSSID: " MACSTR " (%s)", MAC2STR(bssid), s);
-    }
+      if (os_memcmp(bssid, &active_association_.getGoal()->bssid, ETH_ALEN) &&
+          !is_zero_ether_addr(bssid))
+      {
+        ROS_ERROR("Got disassociation on unexpected BSSID: " MACSTR " (%s)", MAC2STR(bssid), s);
+      }
     
-    active_association_.setAborted();
-    active_association_ = null_associate_goal_handle_;
+      active_association_.setAborted();
+      active_association_ = null_associate_goal_handle_;
+    }
+
     publishUnassociated();
-    lockedAssociateWork();
+    requestAssociateWork();
   }
   
   void assocSucceeded()
@@ -465,11 +476,6 @@ private:
   void associateWork()
   {
     boost::recursive_mutex::scoped_lock lock(associate_mutex_);
-    lockedAssociateWork();
-  }
-
-  void lockedAssociateWork()
-  {
     associate_work_requested_ = false;
 
     while (!associate_cancel_queue_.empty())
@@ -494,19 +500,29 @@ private:
     
     if (!associate_goal_queue_.empty())
     {
-      if (active_association_ != null_associate_goal_handle_)
-      {
-        // Don't call stopActiveAssociation here so that reassociate can
-        // happen. FIXME What happens if reassoc fails? Are we back on the
-        // original AP? That doesn't sound great.
-        active_association_.setAborted();
-        active_association_ = null_associate_goal_handle_; // Avoids error message in startActiveAssociation.
-      }
-
       AssociateActionServer::GoalHandle gh = associate_goal_queue_.front();
-      associate_goal_queue_.pop();
+      if (active_association_ != null_associate_goal_handle_ && active_association_.getGoal()->ssid != gh.getGoal()->ssid)
+      {
+        ROS_INFO("Unassociating prior to ESSID switch.");
+        stopActiveAssociation();
+        //// Don't call stopActiveAssociation here so that reassociate can
+        //// happen. FIXME What happens if reassoc fails? Are we back on the
+        //// original AP? That doesn't sound great.
+        //active_association_.setAborted();
+        //active_association_ = null_associate_goal_handle_; // Avoids error message in startActiveAssociation.
+      }
+      else
+      {
+        if (active_association_ != null_associate_goal_handle_)
+        {
+          active_association_.setAborted();
+          active_association_ = null_associate_goal_handle_; // Avoids error message in startActiveAssociation.
+        }
+
+        associate_goal_queue_.pop();
       
-      startActiveAssociation(gh);      
+        startActiveAssociation(gh);      
+      }
     }
   }
 
@@ -646,7 +662,7 @@ private:
         if (wpa_req.freqs == 0)
           timeout = 10000;
         else
-          timeout = goal->frequencies.size() * 450;
+          timeout = goal->frequencies.size() * 550;
         eloop_register_timeout(timeout / 1000, 1000 * (timeout % 1000), scanTimeoutHandler, wpa_s_, NULL);
         wpa_supplicant_trigger_scan(wpa_s_, &wpa_req);
       }
