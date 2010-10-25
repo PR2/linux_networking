@@ -43,6 +43,8 @@ def is_not_associating(state):
 class Radio:
     def __init__(self, interface_name):
         self.interface_name = interface_name
+        self._last_assoc_msg = None
+        self._associating = False
         self.associated = state_publisher.StatePublisher(Unassociated)
         self.frequency_list = state_publisher.StatePublisher([])
         self.network_list = state_publisher.StatePublisher([])
@@ -60,7 +62,6 @@ class Radio:
         self.scan_deferred = None
 
         prefix = rospy.resolve_name("wifi")+"/"+interface_name+"/"
-        rospy.Subscriber(prefix + "association_state", wpa_msgs.AssociateFeedback, self._association_state_callback)
         rospy.Subscriber(prefix + "scan_results", wpa_msgs.ScanResult, self._scan_results_callback)
         rospy.Subscriber(prefix + "network_list", wpa_msgs.NetworkList, self._network_list_callback)
         rospy.Subscriber(prefix + "frequency_list", wpa_msgs.FrequencyList, self._frequency_list_callback)
@@ -89,12 +90,25 @@ class Radio:
     def associate(self, id):
         ssid = id[0]
         bssid = mac_addr.to_packed(id[1])
-        self._associate_action.send_goal(wpa_msgs.AssociateGoal(ssid, bssid))
+        self._associate_action.send_goal(wpa_msgs.AssociateGoal(ssid, bssid), 
+                done_cb = self._assoc_done_cb, 
+                feedback_cb = self._assoc_feedback_cb)
         self.associated.set(Associating)
 
     def unassociate(self):
         self._associate_action.cancel_all_goals()
 
+    @mainThreadCallback
+    def _assoc_feedback_cb(self, fbk):
+        if fbk.associated:
+            self.associated.set(fbk.bss)
+        else:
+            self.associated.set(Associating)
+
+    @mainThreadCallback
+    def _assoc_done_cb(self, state, rslt):
+        self.associated.set(Unassociated)
+    
     @mainThreadCallback
     def _scan_done_callback(self, state, rslt):
         """Called when all our scans are done."""
@@ -131,9 +145,3 @@ class Radio:
         self.raw_scan_results = msg.bss
         self._filter_raw_scan_results() 
 
-    @mainThreadCallback
-    def _association_state_callback(self, msg):
-        if msg.associated:
-            self.associated.set(msg.bss)
-        else:
-            self.associated.set(Unassociated)
