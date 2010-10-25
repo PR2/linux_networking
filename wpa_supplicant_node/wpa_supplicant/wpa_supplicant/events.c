@@ -1175,6 +1175,7 @@ static void wpa_supplicant_event_assoc(struct wpa_supplicant *wpa_s,
 #ifdef CONFIG_SME
 	os_memcpy(wpa_s->sme.prev_bssid, bssid, ETH_ALEN);
 	wpa_s->sme.prev_bssid_set = 1;
+        wpa_msg(wpa_s, MSG_INFO, "prev_bssid set");
 #endif /* CONFIG_SME */
 
 	wpa_msg(wpa_s, MSG_INFO, "Associated with " MACSTR, MAC2STR(bssid));
@@ -1321,7 +1322,7 @@ static void wpa_supplicant_event_disassoc(struct wpa_supplicant *wpa_s,
 		wpa_clear_keys(wpa_s, wpa_s->bssid);
 	}
         
-        ros_assoc_failed(wpa_s, bssid, "Disassociation event received");
+        //ros_assoc_failed(wpa_s, bssid, "Disassociation event received");
 
 	wpa_supplicant_mark_disassoc(wpa_s);
 	bgscan_deinit(wpa_s);
@@ -1598,6 +1599,7 @@ void wpa_supplicant_event(void *ctx, enum wpa_event_type event,
 {
 	struct wpa_supplicant *wpa_s = ctx;
 	u16 reason_code = 0;
+        struct u8 *event_bssid;
 
 	switch (event) {
 	case EVENT_AUTH:
@@ -1615,17 +1617,23 @@ void wpa_supplicant_event(void *ctx, enum wpa_event_type event,
 			break;
 		}
 #endif /* CONFIG_AP */
-		if (data)
-			reason_code = data->deauth_info.reason_code;
+		if (data) {
+                  reason_code = data->disassoc_info.reason_code;
+                  event_bssid = data->disassoc_info.addr;
+                }
 		if (wpa_s->drv_flags & WPA_DRIVER_FLAGS_SME)
 			sme_event_disassoc(wpa_s, data);
 		/* fall through */
 	case EVENT_DEAUTH:
 		if (event == EVENT_DEAUTH) {
 			wpa_printf(MSG_DEBUG, "Deauthentication notification");
-			if (data)
+			if (data) {
 				reason_code = data->deauth_info.reason_code;
+                                event_bssid = data->deauth_info.addr;
+                        }
 		}
+                if (wpa_s->current_bss && event_bssid && os_memcmp(wpa_s->current_bss->bssid, event_bssid, ETH_ALEN))
+                  break; // A new association is in progress. This event refers to an old association.
 #ifdef CONFIG_AP
 		if (wpa_s->ap_iface && data) {
 			hostapd_notif_disassoc(wpa_s->ap_iface->bss[0],
