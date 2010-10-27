@@ -413,6 +413,7 @@ class RadioManager:
                 iface.radio_sm.associate_request.trigger(best_bss.id)
 
     def _dhcp_fail(self, iface):
+        print >> radio_manager_decisions, "DHCP failed, taking down", iface.iface
         iface.interface_upper.restart()
 
     def _ping_fail():
