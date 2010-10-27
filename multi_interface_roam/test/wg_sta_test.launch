@@ -6,6 +6,6 @@
   </node>
 
   <node pkg="wpa_supplicant_node" type="wpa_supplicant_node" name="wpa_supplicant_node_$(env IFACE)"
-        args="-Dnl80211 -c $(find multi_interface_roam)/test/wg_networks.conf -i $(env IFACE) -dddd" output="screen"/>
+        args="-Dnl80211 -c $(find multi_interface_roam)/test/wg_networks.conf -i $(env IFACE) -t -dddddd" output="screen"/>
 
 </launch>
