@@ -150,16 +150,6 @@ class Bss:
         else:
             return 0
 
-    def desirability(self, expiry_time = 0, iface = None):
-        #print "desirability", mac_addr.pretty(self.bssid), 
-        desirabilities = [bss.level for bss_iface, bss in self.by_iface.iteritems() if bss.stamp.to_sec() > expiry_time and (iface is None or bss_iface == iface)]
-        if desirabilities:
-            #print max(desirabilities)
-            return max(desirabilities)
-        else:
-            #print -1e1000
-            return -1e1000
-
 class BssList:
     def __init__(self, freq_list):
         self.bsses = {}
@@ -297,6 +287,7 @@ class RadioManager:
         self.forced_ssid = ""
         self.forced_bssid = ""
         self.scan_manager = ScanManager()
+        self.iface_associations = {}
         self.initial_inhibit_end = time.time() + config.get_parameter('initial_assoc_inhibit', 5)
         self.bss_expiry_time = config.get_parameter('bss_expiry_time', 5)
         self.activate_hysteresis = config.get_parameter('activate_hysteresis', 5)
@@ -304,6 +295,7 @@ class RadioManager:
         self.scan_period_warm = config.get_parameter('scan_period_warm', 10)
         self.scan_period_hot = config.get_parameter('scan_period_hot', 4)
         self.reassociate_hysteresis = config.get_parameter('reassociate_hysteresis', 5)
+        self.same_bss_penalty = config.get_parameter('same_bss_penalty', 20)
         self.interfaces = set()
 
         self.set_mode() # Initializes some variables
@@ -328,6 +320,9 @@ class RadioManager:
             self.scan_manager._trigger_scan(iface) # In case there were no frequencies before.
     
     def _associated_cb(self, iface, old_state, new_state):
+        if new_state == radio.Unassociated:
+            if iface in self.iface_associations:
+                del self.iface_associations[iface]
         self._check_cur_bss(iface)
 
     def _check_cur_bss(self, iface):
@@ -369,7 +364,7 @@ class RadioManager:
                 #print "Candidate bsses:", candidate_bsses
                 if candidate_bsses:
                     expiry_time = now - self.bss_expiry_time
-                    best_bss = max(candidate_bsses, key = lambda bss: bss.desirability(expiry_time, iface))
+                    best_bss = max(candidate_bsses, key = lambda bss: self.desirability(bss, expiry_time, iface))
                     if best_bss.by_iface[iface].stamp.to_sec() < expiry_time:
                         print "Best bss is expired.", mac_addr.pretty(best_bss.bssid)
                         best_bss = None
@@ -382,7 +377,7 @@ class RadioManager:
                     #print self.scan_manager.bss_list.bsses.values()
                     continue
 
-                best_desirability = best_bss.desirability(expiry_time, iface)
+                best_desirability = self.desirability(best_bss, expiry_time, iface)
                 print "Best bss:", mac_addr.pretty(best_bss.bssid), best_desirability
 
                 if cur_assoc:
@@ -395,13 +390,13 @@ class RadioManager:
                     cur_id = make_id(cur_assoc)
                     if cur_id in self.scan_manager.bss_list.bsses:
                         cur_bss = self.scan_manager.bss_list.bsses[make_id(cur_assoc)]
-                        cur_desirability = cur_bss.desirability(expiry_time, iface)
+                        cur_desirability = self.desirability(cur_bss, expiry_time, iface)
                     else:
                         cur_desirability = -1e1000
                     
                     # Is the best ap better enough than the current best?
                     if cur_desirability + self.reassociate_hysteresis > best_desirability:
-                        print "Best bss not over hysteresis threshold: %s %f > %s %f"%(mac_addr.pretty(cur_assoc.bssid), cur_desirability, mac_addr.pretty(best_bss.bssid), best_bss.desirability())
+                        print "Best bss not over hysteresis threshold: %s %f > %s %f"%(mac_addr.pretty(cur_assoc.bssid), cur_desirability, mac_addr.pretty(best_bss.bssid), self.desirability(best_bss))
                         continue
 
                 # Let's associate
@@ -411,6 +406,7 @@ class RadioManager:
                 else:
                     print >> radio_manager_decisions, "from unassociated"
                 iface.radio_sm.associate_request.trigger(best_bss.id)
+                self.iface_associations[iface] = best_bss.id
 
     def _dhcp_fail(self, iface):
         print >> radio_manager_decisions, "DHCP failed, taking down", iface.iface
@@ -470,7 +466,7 @@ class RadioManager:
         candidate_bsses = filter(self.check_bss_matches_forcing, 
                 self.scan_manager.bss_list.bsses.itervalues())
         expiry_time = now - self.hot_bss_expiry_time
-        candidate_bsses.sort(key = lambda bss: bss.desirability(expiry_time), reverse = True)
+        candidate_bsses.sort(key = lambda bss: self.desirability(bss, expiry_time), reverse = True)
         #print [candidate_bsses]
         periods = dict((f, self.scan_manager.frequencies.scan_period_cold) 
                 for f in self.scan_manager.frequencies.frequencies)
@@ -478,7 +474,7 @@ class RadioManager:
         print >> scan_periods_log, "\033[2J\033[0;0H"
         print >> scan_periods_log, "Candidate bsses:"
         for bss in candidate_bsses:
-            print >> scan_periods_log, bss.ssid, mac_addr.pretty(bss.bssid), bss.frequency, bss.desirability(expiry_time), now - bss.last_seen()
+            print >> scan_periods_log, bss.ssid, mac_addr.pretty(bss.bssid), bss.frequency, self.desirability(bss, expiry_time), now - bss.last_seen()
             if hot_frequencies < self.max_hot_frequencies and periods[bss.frequency] != self.scan_period_hot:
                 hot_frequencies += 1
                 p = self.scan_period_hot
@@ -493,5 +489,24 @@ class RadioManager:
             print >> scan_periods_log, f, periods[f], self.scan_manager.frequencies.frequencies[f].next_scan_time - now
             self.scan_manager.frequencies.set_freq_period(f, periods[f])
 
+    def desirability(self, target_bss, expiry_time = 0, iface = None):
+        #print "desirability", mac_addr.pretty(target_bss.bssid), 
+        desirabilities = [bss.level for bss_iface, bss in target_bss.by_iface.iteritems() if bss.stamp.to_sec() > expiry_time and (iface is None or bss_iface == iface)]
+        
+        if desirabilities:
+            # If we are calculating desirability for a particular interface,
+            # penalize if another interface is already associating/associated
+            # to the bss.
+            penalty = 0
+            if iface:
+                target_id = make_id(target_bss)
+                for i, id in self.iface_associations.iteritems():
+                    if i != iface and id == target_id:
+                        penalty = self.same_bss_penalty
 
+            #print max(desirabilities)
+            return max(desirabilities) - penalty
+        else:
+            #print -1e1000
+            return -1e1000
 
