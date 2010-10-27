@@ -9,6 +9,9 @@ from multi_interface_roam.cfg import MultiInterfaceRoamConfig
 import mac_addr
 import interface_selector
 import sys
+from std_msgs.msg import Int32
+import sigblock
+import signal
 
 # FIXME May want to kill this at some point
 import asmach as smach
@@ -16,7 +19,10 @@ smach.logdebug = lambda x: None
 
 class Node:
     def __init__(self, *args, **kwargs):
+        sigblock.save_mask()
+        sigblock.block_signal(signal.SIGCHLD)
         rospy.init_node(*args, **kwargs)
+        sigblock.restore_mask()
         rospy.core.add_shutdown_hook(self._shutdown_by_ros)
         reactor.addSystemEventTrigger('after', 'shutdown', self._shutdown_by_reactor)
 
@@ -31,6 +37,17 @@ class RoamNode:
         Node("multi_interface_roam")
         self.interface_selector = interface_selector.InterfaceSelector()
         self.reconfig_server = dynamic_reconfigure.server.Server(MultiInterfaceRoamConfig, self.reconfigure)
+        self.iface_id_pub = rospy.Publisher('/current_iface_id', Int32, latch = True)
+        self.interface_selector.update_event.subscribe_repeating(self._publish_status)
+        self._publish_mapping_list = self.interface_selector.interfaces.values()
+
+    def _publish_status(self):
+        ai = self.interface_selector.active_interfaces
+        if not ai or ai[0] not in self._publish_mapping_list:
+            index = -1
+        else:
+            index = self._publish_mapping_list.index(ai[0])
+        self.iface_id_pub.publish(index)
 
     def reconfigure(self, config, level):
         if config['interface'] not in self.interface_selector.interfaces:
@@ -49,11 +66,13 @@ class RoamNode:
         return config
 
 if __name__ == "__main__":
-    try:
-        RoamNode()
-    except:
-        import traceback
-        traceback.print_exc()
-        print >> sys.stderr, "\nCaught exception during startup. Shutting down."
-        reactor.fireSystemEvent('shutdown')
+    def start():
+        try:
+            RoamNode()
+        except:
+            import traceback
+            traceback.print_exc()
+            print >> sys.stderr, "\nCaught exception during startup. Shutting down."
+            reactor.fireSystemEvent('shutdown')
+    reactor.addSystemEventTrigger('before', 'startup', start)
     reactor.run()
