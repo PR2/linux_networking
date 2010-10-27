@@ -1,11 +1,11 @@
 include $(shell rospack find mk)/cmake.mk
 
-all: src/multi_interface_roam/sigmask.so
+all: src/multi_interface_roam/sigblock.so
 
-clean: sigmask_clean
+clean: sigblock_clean
 
-sigmask_clean:
-	rm src/multi_interface_roam/sigmask.so
+sigblock_clean:
+	rm src/multi_interface_roam/sigblock.so
 
-src/multi_interface_roam/sigmask.so:
-	cd src/multi_interface_roam; ./sigmask_build.py build_ext --inplace
+src/multi_interface_roam/sigblock.so: src/multi_interface_roam/sigblock.c
+	cd src/multi_interface_roam; ./sigblock_build.py build_ext --inplace
