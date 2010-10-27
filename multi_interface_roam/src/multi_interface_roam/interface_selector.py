@@ -35,6 +35,7 @@ class InterfaceSelector:
         self.forced_interface = ""
         self.use_tunnel = True
         self.tunnel_interface = config.get_parameter('tunnel_interface', "")
+        self.active_interfaces = []
 
         print "Resolving basestation IP. (Blocking operation.)"
         self.basestation_ip = socket.gethostbyname(config.get_parameter('base_station'))
@@ -179,3 +180,5 @@ class InterfaceSelector:
             rule = "rule  " if iface in active_interfaces else "norule"
             print >> summary_logger, "#% 2i %10.10s %7.1f %7.3f %7.3f %17.17s %7.3f %3.0f %s %s"% \
                     (rank, iface.prettyname, (iface.timeout_time - now), iface.score, iface.prescore, iface.bssid, iface.goodness, iface.reliability, rule, active)
+
+        self.active_interfaces = active_interfaces
