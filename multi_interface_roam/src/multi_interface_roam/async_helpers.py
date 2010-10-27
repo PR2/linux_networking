@@ -280,7 +280,6 @@ if __name__ == "__main__":
                 after = len(gc.get_objects())
                 if before == after:
                     break
-            print "Reps", iter
             self.assertEqual(before, after)
             
         @async_test
