@@ -17,7 +17,7 @@ ping_weighting: 0.1
 interfaces:
 #  eth0: { type: wired, priority: 100 }
   wlan0: { type: wireless }
-#  wlan2: { type: wireless }
+  wlan1: { type: wireless }
 #  10.0.0.1@eth0: { type: static, priority: 200, name: WGDirect }
 #  wan0: { type: wired,  priority: 20 }
 #  "basestation-local2@lan1": { type: static, name: bs@lan1, priority: 30 }
