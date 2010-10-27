@@ -11,7 +11,7 @@
   </p>
   </description>
   <author>Blaise Gassend</author>
-  <license>BSD, LGPL</license>
+  <license>BSD, LGPL, GPL for sigblock</license>
   <review status="unreviewed" notes=""/>
   <url>http://ros.org/wiki/multi_interface_roam</url>
   <depend package="rospy"/>
