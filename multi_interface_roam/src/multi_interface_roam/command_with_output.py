@@ -3,7 +3,6 @@
 import logging
 import logging.handlers
 import os
-from logging_config import *
 from twisted.internet import protocol, reactor
 import signal
 
