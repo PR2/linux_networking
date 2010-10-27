@@ -270,16 +270,17 @@ if __name__ == "__main__":
             before = 0
             after = 0
 
-            # First couple of times through seems to create some new data.
-            yield select(Timeout(0.001))
-            yield select(Timeout(0.001))
-            
-            before = len(gc.get_objects())
-            # The yielding statement seems necessary, some stuff only gets
-            # cleaned up when going through the reactor main loop.
-            yield select(Timeout(0.001))
-            after = len(gc.get_objects())
-            
+            # First few times through seems to create some new data, so
+            # retry. (#4518)
+            for iter in range(10):
+                before = len(gc.get_objects())
+                # The yielding statement seems necessary, some stuff only gets
+                # cleaned up when going through the reactor main loop.
+                yield select(Timeout(0.001))
+                after = len(gc.get_objects())
+                if before == after:
+                    break
+            print "Reps", iter
             self.assertEqual(before, after)
             
         @async_test
