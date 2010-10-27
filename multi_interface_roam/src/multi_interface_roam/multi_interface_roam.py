@@ -290,7 +290,8 @@ class DhcpClient(CommandWithOutput):
         self.deconfig_callback = deconfig_callback
         self.leasefail_callback = leasefail_callback
         script = os.path.join(os.path.dirname(__file__), 'udhcpc_echo.sh')
-        CommandWithOutput.__init__(self, ['udhcpc', '-s', script, '-i', iface, '-f'], "udhcpc_"+iface)
+        udhcpc_script = os.path.join(os.path.dirname(__file__), 'udhcpc.sh')
+        CommandWithOutput.__init__(self, [udhcpc_script, '-s', script, '-i', iface, '-f'], "udhcpc_"+iface)
         self.restart_delay = 0
   
     def got_line(self, line):
