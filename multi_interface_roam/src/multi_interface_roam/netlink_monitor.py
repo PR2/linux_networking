@@ -6,6 +6,8 @@ import threading
 import time
 import traceback
 import pythonwifi.iwlibs
+import async_helpers
+from twisted.internet.defer import inlineCallbacks
 
 # TODO 
 # Make this autoshutdown when there are no references.
@@ -35,8 +37,9 @@ class NetlinkMonitor(command_with_output.CommandWithOutput):
         self.deleted = None
         command_with_output.CommandWithOutput.__init__(self, ['ip', 'monitor', 'link', 'addr'], 'ip_monitor')
 
+    @inlineCallbacks
     def child_restart(self):
-        time.sleep(0.2) # Limit race conditions on getting the startup state.
+        yield async_helpers.async_sleep(0.2) # Limit race conditions on getting the startup state.
         current_state = RunCommand('ip', 'addr')
         with self.lock:
             old_cur_iface = self.cur_iface
