@@ -6,8 +6,8 @@ wpa_config: "/etc/ros/wifi/networks.conf"
 base_station: "prbase7"
 ping_port: 1194
 tunnel_interface: 'tun9'
-local_networks: []
-#local_networks: [ '10.0.0.0/21' ]
+#local_networks: []
+local_networks: [ '10.68.0.0/24' ]
 reliability_threshold: 50
 scan_period_cold: 10
 scan_period_warm: 5
