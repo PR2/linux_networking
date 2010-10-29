@@ -216,7 +216,7 @@ class Statistics:
             return 0.0
 
     def get_average_latency_restricted(self):
-        if self.count: 
+        if self.count_restricted: 
             return self.sum_latency_restricted / float(self.count_restricted)
         else:
             return 0.0
