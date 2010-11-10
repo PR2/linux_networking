@@ -1,0 +1,17 @@
+<package>
+  <description brief="ddwrt_access_point">
+    A ROS node that controls a Linksys WRT610Nv2 access point with
+    a dd-wrt firmware. Other access points models/dd-wrt versions
+    may be compatible as long as the web interface is identical.
+  </description>
+  <author>Personal Networks</author>
+  <license>BSD</license>
+  <review status="unreviewed" notes=""/>
+  <url>http://ros.org/wiki/ddwrt_access_point</url>
+  <depend package="rospy"/>
+  <depend package="access_point_control"/>
+  <depend package="dynamic_reconfigure"/>
+  <depend package="ieee80211_channels"/>
+</package>
+
+
