@@ -1,0 +1,17 @@
+<package>
+  <description brief="access_point_control">
+    Defines an API for access point control based on 
+    dynamic_reconfigure. Other packages must
+    implement the API for various access-point models: 
+    for example: hostapd_access_point for hostapd-based control or
+    linksys_access_point for Linksys router web interface.
+  </description>
+  <author>Catalin Drula</author>
+  <license>BSD</license>
+  <review status="unreviewed" notes=""/>
+  <url>http://ros.org/wiki/access_point_control</url>
+  <depend package="rospy"/>
+  <depend package="dynamic_reconfigure"/>
+</package>
+
+
