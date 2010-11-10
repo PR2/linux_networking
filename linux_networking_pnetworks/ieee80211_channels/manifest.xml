@@ -1,0 +1,15 @@
+<package>
+  <description brief="ieee80211_channels">
+    This package provides mapping from frequencies to
+    IEEE802.11 channels and vice-versa.
+  </description>
+  <author>Catalin Drula</author>
+  <license>BSD</license>
+  <review status="unreviewed" notes=""/>
+  <url>http://ros.org/wiki/ieee80211_channels</url>
+  <export>
+    <rosdoc config="rosdoc.yaml"/>
+  </export>
+</package>
+
+

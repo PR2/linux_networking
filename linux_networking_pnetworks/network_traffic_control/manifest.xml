@@ -1,0 +1,13 @@
+<package>
+  <description brief="network_traffic_control">
+  A ROS node that allows control of network emulation parameters such as bandwidth, loss and latency for a Linux network interface. 
+  </description>
+  <author>Catalin Drula</author>
+  <license>BSD</license>
+  <review status="unreviewed" notes=""/>
+  <url>http://ros.org/wiki/network_traffic_control</url>
+  <depend package="rospy"/>
+  <depend package="dynamic_reconfigure"/>
+</package>
+
+

@@ -1,0 +1,19 @@
+<package>
+  <description brief="hostapd_access_point">
+    A ROS node that controls a hostapd-based access
+    point. It is mainly intended for use with a wireless 
+    network adapter running in master mode. It implements 
+    the dynamic_reconfigure interface defined
+    in the [[access_point_control]] package.
+  </description>
+  <author>Catalin Drula</author>
+  <license>BSD</license>
+  <review status="unreviewed" notes=""/>
+  <url>http://ros.org/wiki/hostapd_access_point</url>
+  <depend package="rospy"/>
+  <depend package="access_point_control"/>
+  <depend package="dynamic_reconfigure"/>
+  <depend package="ieee80211_channels"/>
+</package>
+
+
