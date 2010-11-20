@@ -25,3 +25,6 @@ python-libpcap:
 
 python-twisted-core:
   ubuntu: python-twisted-core
+
+hostapd:
+  ubuntu: hostapd

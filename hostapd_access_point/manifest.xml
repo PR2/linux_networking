@@ -14,6 +14,7 @@
   <depend package="access_point_control"/>
   <depend package="dynamic_reconfigure"/>
   <depend package="ieee80211_channels"/>
+  <rosdep name="hostapd"/>
 </package>
 
 
