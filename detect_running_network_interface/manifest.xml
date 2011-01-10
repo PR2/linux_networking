@@ -1,0 +1,18 @@
+<package>
+  <description brief="detect_running_network_interface">
+
+     A ROS node that watches a given network interface and publishes
+     whether it is both UP and RUNNING (indicating that a cable is
+     plugged into it and communication is happening, for instance) or
+     not.
+
+  </description>
+  <author>Dave Hershberger</author>
+  <license>BSD</license>
+  <review status="unreviewed" notes=""/>
+  <url>http://ros.org/wiki/detect_running_network_interface</url>
+  <depend package="roscpp"/>
+  <depend package="std_msgs"/>
+</package>
+
+
