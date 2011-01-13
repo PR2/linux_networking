@@ -43,7 +43,7 @@ bool interfaceIsRunning( std::string interface_name )
 
 int main( int argc, char **argv )
 {
-  ros::init( argc, argv, "detect_running_network_interface" );
+  ros::init( argc, argv, "network_detector" );
   ros::NodeHandle node;
   std::string interface_name;
   if( !ros::param::get( "~interface_name", interface_name ))
@@ -51,7 +51,7 @@ int main( int argc, char **argv )
     ROS_FATAL( "No parameter 'interface_name' specified.  Don't know which interface to watch.  Exiting." );
     exit(1);
   }
-  ros::Publisher running_pub = node.advertise<std_msgs::Bool>( "network_connected", 0, true );
+  ros::Publisher running_pub = node.advertise<std_msgs::Bool>( "network/connected", 0, true );
   int loop_count;
   bool first_time = true;
   bool was_running = false;

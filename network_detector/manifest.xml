@@ -1,5 +1,5 @@
 <package>
-  <description brief="detect_running_network_interface">
+  <description brief="network_detector">
 
      A ROS node that watches a given network interface and publishes
      whether it is both UP and RUNNING (indicating that a cable is
@@ -14,5 +14,3 @@
   <depend package="roscpp"/>
   <depend package="std_msgs"/>
 </package>
-
-

@@ -2,7 +2,7 @@
 \mainpage
 \htmlinclude manifest.html
 
-\b detect_running_network_interface is a small node which watches a
+\b network_detector is a small node which watches a
 network interface (such as eth0) and publishes whether it is connected
 or not.
 
@@ -10,8 +10,8 @@ or not.
 Provide an overview of your package.
 -->
 
-detect_running_network_interface requires a single parameter,
-"detect_running_network_interface/interface_name", giving the name of
+network_detector requires a single parameter,
+"network_detector/interface_name", giving the name of
 the interface.
 
 The output is a single boolean on a topic called "network_connected".
