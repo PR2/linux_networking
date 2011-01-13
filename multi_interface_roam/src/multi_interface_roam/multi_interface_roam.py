@@ -553,6 +553,7 @@ class DhcpInterface(NetworkConnection):
         self.dhcp_timeout = 7
         self.timeout_time = 0
         self.increase_timeout(self.start_over_timeout)
+        self.timed_out_time = 0
 
         self.dhclient = DhcpClient(iface, self.bound, self.deconfigured, self.leasefail)
         self.startover()
@@ -561,6 +562,7 @@ class DhcpInterface(NetworkConnection):
         time_to_timeout = self.timeout_time - time.time()
         if time_to_timeout < 0:
             print "Interface", self.name, "timed out."
+            self.timed_out_time = time.time()
             self.startover()
 
         NetworkConnection.update1(self)
@@ -796,7 +798,7 @@ class WiredInterface(DhcpInterface):
         netlink_monitor.register_link(iface, self.linkchange)
     
     def linkchange(self, up):
-        if up != (self.status != NOLINK) and self.initialized:
+        if up != (self.status != NOLINK) and self.initialized and time.time() - self.timed_out_time > 10:
             os.system('beep')
         DhcpInterface.linkchange(self, up)
     
