@@ -284,8 +284,6 @@ class ScanManager:
 
 class RadioManager:
     def __init__(self):
-        self.forced_ssid = ""
-        self.forced_bssid = ""
         self.scan_manager = ScanManager()
         self.iface_associations = {}
         self.initial_inhibit_end = time.time() + config.get_parameter('initial_assoc_inhibit', 5)
@@ -310,7 +308,8 @@ class RadioManager:
         iface.radio_sm.associated.subscribe(self._associated_cb, iface)
         iface.dhcpdata.error_event.subscribe_repeating(self._dhcp_fail, iface)
     
-    def set_mode(self, ssid="", bssid="", band=0):
+    def set_mode(self, ssid="", bssid="", band=0, scan_only=False):
+        self.scan_only = scan_only
         self.forced_ssid = ssid
         self.forced_bssid = bssid
         self.forced_band = band
@@ -339,6 +338,8 @@ class RadioManager:
 
     def check_bss_matches_forcing(self, bss):
         """Checks that the bss matches the forced bssid, ssid and band."""
+        if self.scan_only:
+            return False
         if not check_band(bss.frequency, self.forced_band):
             return False
         if self.forced_bssid and self.forced_bssid != bss.bssid:

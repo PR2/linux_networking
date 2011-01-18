@@ -61,7 +61,7 @@ class RoamNode:
             bssid = mac_addr.str_to_packed(config['bssid'])
         use_tunnel = config['use_tunnel']
 
-        self.interface_selector.set_mode(ssid, bssid, interface, use_tunnel, config['band'])
+        self.interface_selector.set_mode(ssid, bssid, interface, use_tunnel, config['band'], config['scan_only'])
 
         return config
 

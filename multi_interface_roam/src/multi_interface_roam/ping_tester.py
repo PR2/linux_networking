@@ -13,7 +13,7 @@ class PingTester:
     def __init__(self, iface, rate, pingtarget, state_pub):
         self.update_event = Event()
         reactor.addSystemEventTrigger('before', 'shutdown', self._shutdown)
-        self.udp_monitor = udpmoncli.MonitorClient([.2], pingtarget, rate, 32, True)
+        self.udp_monitor = udpmoncli.MonitorClient([config.get_parameter('ping_max_latency', 0.2)], pingtarget, rate, 32, True)
         CompositeStatePublisher(lambda (addr, ready): None if not ready else addr, [
             netlink_monitor.get_state_publisher(iface, IFSTATE.ADDR),
             state_pub,
@@ -61,15 +61,21 @@ class PingMonitor:
             self.restart_time = time.time() + self.ping_timeout
             self.is_verified.set(True)
         elif self.has_address and self.restart_time < time.time():
-            print "PingMonitor restarting", self.iface.iface
-            self.has_address = False
-            self.iface.interface_upper.restart()
+            if not config.get_parameter('disable_ping_timeout'):
+                print "PingMonitor restarting", self.iface.iface
+                self.has_address = False
+                self.iface.interface_upper.restart()
+            else:
+                print "PingMonitor restart was disabled by disable_ping_timeout", self.iface.iface
+                self._set_timeout()
 
     def _has_address_cb(self, iface, old_state, new_state):
         self.is_verified.set(False)
         self.has_address = bool(new_state)
         if new_state:
-            self.restart_time = time.time() + self.ping_timeout
+            self._set_timeout()
         else:
             self.restart_time = 1e1000
 
+    def _set_timeout(self):
+        self.restart_time = time.time() + self.ping_timeout

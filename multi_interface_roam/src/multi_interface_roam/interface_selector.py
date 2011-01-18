@@ -89,9 +89,9 @@ class InterfaceSelector:
         self.shut_down = True
 
     @mainThreadCallback
-    def set_mode(self, ssid = "", bssid = "", sel_interface = "", use_tunnel = True, band = 3):
+    def set_mode(self, ssid = "", bssid = "", sel_interface = "", use_tunnel = True, band = 3, scan_only = False):
         self.goodness_weight = config.get_parameter('ping_weighting', 0.5)
-        self.radio_manager.set_mode(ssid, bssid, band)
+        self.radio_manager.set_mode(ssid, bssid, band, scan_only)
         self.forced_interface = sel_interface
         self.use_tunnel = use_tunnel
         if use_tunnel:
