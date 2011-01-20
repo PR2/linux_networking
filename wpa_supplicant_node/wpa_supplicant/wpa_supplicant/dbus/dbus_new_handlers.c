@@ -33,6 +33,8 @@
 #include "dbus_new_handlers.h"
 #include "dbus_dict_helpers.h"
 
+#include "../../../src/nodes/wpa_supplicant_node.h"
+
 extern int wpa_debug_level;
 extern int wpa_debug_show_keys;
 extern int wpa_debug_timestamp;
@@ -880,7 +882,7 @@ DBusMessage * wpas_dbus_getter_interfaces(DBusMessage *message,
 	}
 
 	for (wpa_s = global->ifaces; wpa_s; wpa_s = wpa_s->next)
-		paths[i] = wpa_s->dbus_new_path;
+		paths[i++] = wpa_s->dbus_new_path;
 
 	reply = wpas_dbus_simple_array_property_getter(message,
 						       DBUS_TYPE_OBJECT_PATH,
@@ -2856,7 +2858,7 @@ DBusMessage * wpas_dbus_getter_network_properties(
 	DBusMessage *reply = NULL;
 	DBusMessageIter	iter, variant_iter, dict_iter;
 	char **iterator;
-	char **props = wpa_config_get_all(net->ssid, 0);
+	char **props = wpa_config_get_all(net->ssid, 1);
 	if (!props)
 		return dbus_message_new_error(message, DBUS_ERROR_NO_MEMORY,
 					      NULL);
@@ -2940,10 +2942,13 @@ DBusMessage * wpas_dbus_setter_network_properties(
 	dbus_message_iter_recurse(&iter, &variant_iter);
 
 	reply = set_network_properties(message, net->wpa_s, ssid,
-				       &variant_iter);
+                                       &variant_iter);
+       
 	if (reply)
 		wpa_printf(MSG_DEBUG, "dbus control interface couldn't set "
 			   "network properties");
+
+        ros_network_list_updated(net->wpa_s);
 
 	return reply;
 }

@@ -36,6 +36,8 @@
 #include "scan.h"
 #include "ctrl_iface.h"
 
+#include "../../src/nodes/wpa_supplicant_node.h"
+
 extern struct wpa_driver_ops *wpa_drivers[];
 
 static int wpa_supplicant_global_iface_list(struct wpa_global *global,
@@ -1102,6 +1104,8 @@ static int wpa_supplicant_ctrl_iface_set_network(
 		wpa_config_update_psk(ssid);
 	else if (os_strcmp(name, "priority") == 0)
 		wpa_config_update_prio_list(wpa_s->conf);
+
+        ros_network_list_updated(wpa_s);
 
 	return 0;
 }

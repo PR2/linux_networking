@@ -12,5 +12,6 @@ void ros_do_work(int, void *, void *);
 void ros_scan_completed(struct wpa_supplicant *wpa_s, struct wpa_scan_results *scan_res);
 void ros_assoc_success(struct wpa_supplicant *wpa_s);
 void ros_assoc_failed(struct wpa_supplicant *wpa_s, const u8* bssid, const char *reason);
+void ros_network_list_updated(struct wpa_supplicant *wpa_s);
 
 #endif

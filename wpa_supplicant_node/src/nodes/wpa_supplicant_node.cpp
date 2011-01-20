@@ -318,7 +318,6 @@ public:
     association_publisher_.publish(fbk);
   }
 
-private:       
   void publishNetworkList()
   {
     wpa_supplicant_node::NetworkList netlist;                          
@@ -347,6 +346,7 @@ private:
     network_list_publisher_.publish(netlist);
   }
 
+private:       
   void publishFrequencyList()
   {
     // FIXME This should be determined in a more general way.
@@ -790,4 +790,9 @@ void ros_assoc_success(wpa_supplicant *wpa_s)
     wpa_s->ros_api->assocSucceeded();
 }
 
+void ros_network_list_updated(wpa_supplicant *wpa_s)
+{
+  if (wpa_s->ros_api)
+    wpa_s->ros_api->publishNetworkList();
+}
 } // extern "C"

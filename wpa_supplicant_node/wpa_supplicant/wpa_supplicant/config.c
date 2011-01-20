@@ -72,8 +72,8 @@ static char * wpa_config_parse_string(const char *value, size_t *len)
 			return NULL;
 		os_memcpy(str, value, *len);
 		str[*len] = '\0';
-		return str;
-	} else {
+		return str;	
+        } else {
 		u8 *str;
 		size_t tlen, hlen = os_strlen(value);
 		if (hlen & 1)

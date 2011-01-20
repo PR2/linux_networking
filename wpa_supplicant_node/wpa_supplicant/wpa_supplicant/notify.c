@@ -26,6 +26,8 @@
 #include "scan.h"
 #include "notify.h"
 
+#include "../../src/nodes/wpa_supplicant_node.h"
+
 int wpas_notify_supplicant_initialized(struct wpa_global *global)
 {
 #ifdef CONFIG_DBUS
@@ -106,6 +108,7 @@ void wpas_notify_network_enabled_changed(struct wpa_supplicant *wpa_s,
 					 struct wpa_ssid *ssid)
 {
 	wpas_dbus_signal_network_enabled_changed(wpa_s, ssid);
+        ros_network_list_updated(wpa_s);
 }
 
 
@@ -183,6 +186,7 @@ void wpas_notify_network_added(struct wpa_supplicant *wpa_s,
 			       struct wpa_ssid *ssid)
 {
 	wpas_dbus_register_network(wpa_s, ssid);
+        ros_network_list_updated(wpa_s);
 }
 
 
@@ -190,6 +194,7 @@ void wpas_notify_network_removed(struct wpa_supplicant *wpa_s,
 				 struct wpa_ssid *ssid)
 {
 	wpas_dbus_unregister_network(wpa_s, ssid->id);
+        ros_network_list_updated(wpa_s);
 }
 
 
