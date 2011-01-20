@@ -16,7 +16,17 @@ from std_msgs.msg import Int32
 import sigblock
 import signal
 import interface
+from netlink_monitor import IFSTATE
 from ieee80211_channels.channels import IEEE80211_Channels
+
+# Make sure states are nice and consistent...
+assert(InterfaceStatus.STATE_NO_INTERFACE == -1)
+assert(IFSTATE.PLUGGED == InterfaceStatus.STATE_PLUGGED)
+assert(IFSTATE.UP == InterfaceStatus.STATE_UP)
+assert(IFSTATE.LINK == InterfaceStatus.STATE_LINK)
+assert(IFSTATE.LINK_ADDR == InterfaceStatus.STATE_LINK_ADDR)
+assert(IFSTATE.ADDR == InterfaceStatus.STATE_ADDR)
+assert(InterfaceStatus.STATE_PINGING == 5)
 
 # FIXME May want to kill this at some point
 import asmach as smach
@@ -80,9 +90,31 @@ class RoamNode:
 
         # status
         msg = MultiInterfaceStatus()
-        #msg.
+        for iface in self._interfaces:
+            msg.interfaces.append(self.gen_status_msg(iface))
+        self.status_pub.publish(msg)
 
         # diagnostics
+                
+    @staticmethod
+    def gen_status_msg(iface):
+        msg = InterfaceStatus()
+        msg.pretty_name = iface.prettyname
+        msg.interface = iface.iface
+        msg.state = iface.status
+        if msg.state == InterfaceStatus.STATE_ADDR and iface.ping_loss < 100:
+           msg.state = InterfaceStatus.STATE_PINGING
+        msg.goodness = iface.goodness
+        msg.reliability = iface.reliability
+        msg.score = iface.score
+        msg.prescore = iface.prescore
+        msg.latency = iface.ping_latency
+        msg.loss = iface.ping_loss
+        if iface.__class__ == interface.WirelessInterface:
+            cur_bss = iface.radio_sm.associated.get()
+            if cur_bss:
+                msg.bss = cur_bss
+        return msg
 
     @staticmethod
     def gen_accesspoint_msg(iface):

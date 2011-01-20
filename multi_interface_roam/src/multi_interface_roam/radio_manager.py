@@ -359,7 +359,7 @@ class RadioManager:
             return
         for iface in self.interfaces:
             cur_assoc = iface.radio_sm.associated.get()
-            print "OK to try reassociating?", iface.iface, iface.radio_sm.scanning_enabled.get(), cur_assoc
+            #print "OK to try reassociating?", iface.iface, iface.radio_sm.scanning_enabled.get(), cur_assoc
             if iface.radio_sm.scanning_enabled.get() and cur_assoc != radio.Associating:
                 # Pick the best bss for this interface.
                 candidate_bsses = filter(self.check_bss_matches_forcing, 

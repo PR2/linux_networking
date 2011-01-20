@@ -6,10 +6,13 @@ int8 STATE_LINK_ADDR = 3     # The interface has a link, and the link has an add
 int8 STATE_ADDR = 4          # The interface has an address.
 int8 STATE_PINGING = 5       # Ping packets are making it through.
 
+string pretty_name           # The pretty name of the interface.
+string interface             # The name of the interface.
 int8 state                   # The state (defined above).
 float32 goodness             # How well this interface is sending packets.
 float32 reliability          # How reliable this interface is expected to be.
 float32 score                # The score use to rank interfaces.
+float32 prescore             # The score use to rank interfaces without penalizing radios that are not active.
 float32 latency              # Latency of ping packets.
 float32 loss                 # Loss of ping packets.
 wpa_supplicant_node/Bss bss  # Current BSS (for a wireless network)

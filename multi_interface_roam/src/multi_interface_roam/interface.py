@@ -34,6 +34,8 @@ class Interface:
         self._update_specialized()
 
         (bins, latency1, latency2) = self.ping_tester.update(interval)
+        self.ping_latency = latency2
+        self.ping_loss = 100 - 100 * bins[0]
         if self.status < IFSTATE.ADDR:
             self.goodness = self.status - IFSTATE.ADDR
             self.reliability = self.status - IFSTATE.ADDR

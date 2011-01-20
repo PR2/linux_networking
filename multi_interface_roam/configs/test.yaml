@@ -3,8 +3,10 @@ wireless_namespace: 'ddwrt'
 wpa_config: "/etc/ros/wifi/networks.conf" 
 #base_station: "10.0.128.10"
 #ping_port: 6868
-base_station: "prbase6"
-ping_port: 1194
+#base_station: "prbase6"
+#ping_port: 1194
+base_station: "gate5.texai.com"
+ping_port: 500
 tunnel_interface: 'tun9'
 #local_networks: []
 local_networks: [ '10.0.2.95/32', '10.0.2.93/32' ]
