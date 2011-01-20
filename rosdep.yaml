@@ -28,3 +28,6 @@ python-twisted-core:
 
 hostapd:
   ubuntu: hostapd
+
+libdbus-dev:
+  ubuntu: libdbus-1-dev
