@@ -19,10 +19,10 @@
   <depend package="std_msgs"/>
   <depend package="diagnostic_msgs"/>
   <depend package="pr2_msgs"/>
-  <depend package="wpa_supplicant"/>
   <depend package="wpa_supplicant_node"/>
   <depend package="asmach"/>
   <depend package="dynamic_reconfigure"/>
+  <depend package="ieee80211_channels"/>
   <rosdep name="python-libpcap"/>"
   <rosdep name="python-twisted-core"/>
   <rosdep name="udhcpc"/>

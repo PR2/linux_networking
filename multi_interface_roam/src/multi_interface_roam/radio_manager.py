@@ -285,6 +285,7 @@ class ScanManager:
 class RadioManager:
     def __init__(self):
         self.scan_manager = ScanManager()
+        self.best_active = None
         self.iface_associations = {}
         self.initial_inhibit_end = time.time() + config.get_parameter('initial_assoc_inhibit', 5)
         self.bss_expiry_time = config.get_parameter('bss_expiry_time', 5)
@@ -438,14 +439,14 @@ class RadioManager:
 
         # Only keep one active interface.
         if active:
-            best_active = max(active, key = iface_score)
+            self.best_active = max(active, key = iface_score)
         else:
-            best_active = None
+            self.best_active = None
         if len(active) > 1:
             for iface in active:
-                if iface != best_active:
+                if iface != self.best_active:
                     iface.radio_sm.activate_request.set(False)
-                    print >> radio_manager_decisions, "XXX Disactivating %s because %s is active and better."%(iface.iface, best_active.iface)
+                    print >> radio_manager_decisions, "XXX Disactivating %s because %s is active and better."%(iface.iface, self.best_active.iface)
 
         # Activate a verified interface if it is better than the current
         # active interface.
@@ -454,11 +455,11 @@ class RadioManager:
             #for iface in verified:
             #    print >> radio_manager_decisions, iface.iface, iface_score(iface), iface in active
             best_inactive_verified = max(inactive_verified, key = iface_score)
-            if not best_active or iface_score(best_inactive_verified) > iface_score(best_active) + self.activate_hysteresis:
-                if not best_active:
+            if not self.best_active or iface_score(best_inactive_verified) > iface_score(self.best_active) + self.activate_hysteresis:
+                if not self.best_active:
                     print >> radio_manager_decisions, "XXX Activating %s because no current best active."%best_inactive_verified.iface
                 else:
-                    print >> radio_manager_decisions, "XXX Activating %s because it is better than %s."%(best_inactive_verified.iface, best_active.iface)
+                    print >> radio_manager_decisions, "XXX Activating %s because it is better than %s."%(best_inactive_verified.iface, self.best_active.iface)
                 best_inactive_verified.radio_sm.activate_request.set(True)
 
         # Keep a closer watch on the most relevant frequencies.

@@ -61,6 +61,8 @@ class InterfaceSelector:
         for iface in interface_names:
             try:
                 new_iface = self.interfaces[iface] = interface.construct(iface, ifaceid)
+                new_iface.score = InterfaceSelector.TERRIBLE_INTERFACE 
+                new_iface.prescore = InterfaceSelector.TERRIBLE_INTERFACE 
                 ifaceid += 1
             except interface.NoType:
                 print >> sys.stderr, "Interface %s has no type."%iface

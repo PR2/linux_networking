@@ -146,8 +146,8 @@ class WirelessInterface(DhcpInterface):
             print
             self.reliability = 0
             self.wifi_quality = -1
-            self.wifi_noise = 1e1000
-            self.wifi_signal = -1e1000
+            self.wifi_noise = 10000
+            self.wifi_signal = -10000
             for s in [ 'Quality', 'Signal', 'Noise' ]:
                 if has_link:
                     self.diags.append((s, 'Error collecting data.'))
