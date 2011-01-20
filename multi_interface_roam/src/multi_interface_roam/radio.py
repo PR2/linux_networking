@@ -6,6 +6,7 @@ import actionlib
 import state_publisher
 import mac_addr
 import event
+import threading
 from twisted.internet.defer import Deferred
 from twisted.internet import reactor
 from async_helpers import mainThreadCallback
@@ -50,6 +51,7 @@ class Radio:
         self.network_list = state_publisher.StatePublisher([])
         self.scan_results_event = event.Event()
         self.scanning = state_publisher.StatePublisher(False)
+        self.mutex = threading.Lock()
 
         #def debug_assoc(iface, old_state, new_state):
         #    print "Assoc change", iface, new_state
@@ -88,11 +90,13 @@ class Radio:
         _scan_action.cancel_all_goals()
 
     def associate(self, id):
+        print "radio.associate", self.interface_name
         ssid = id[0]
         bssid = mac_addr.to_packed(id[1])
-        self._associate_action.send_goal(wpa_msgs.AssociateGoal(ssid, bssid), 
-                done_cb = self._assoc_done_cb, 
-                feedback_cb = self._assoc_feedback_cb)
+        with self.mutex:
+            self._associate_action.send_goal(wpa_msgs.AssociateGoal(ssid, bssid), 
+                    done_cb = self._assoc_done_cb, 
+                    feedback_cb = self._assoc_feedback_cb)
         self.associated.set(Associating)
 
     def unassociate(self):
@@ -100,14 +104,19 @@ class Radio:
 
     @mainThreadCallback
     def _assoc_feedback_cb(self, fbk):
+        print "_assoc_feedback_cb", self.interface_name, fbk.associated, fbk.associating
         if fbk.associated:
             self.associated.set(fbk.bss)
-        else:
-            self.associated.set(Associating)
 
-    @mainThreadCallback
     def _assoc_done_cb(self, state, rslt):
-        self.associated.set(Unassociated)
+        # DANGER, this is not run in the main thread!!
+        
+        print "_assoc_done_cb", self.interface_name
+        # Make sure that no feedback for this goal will arrive after we
+        # have processed the goal.
+        with self.mutex:
+            self._associate_action.stop_tracking_goal()
+        reactor.callFromThread(self.associated.set, Unassociated)
     
     @mainThreadCallback
     def _scan_done_callback(self, state, rslt):

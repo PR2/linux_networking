@@ -350,15 +350,16 @@ class RadioManager:
         return True
 
     def _new_scan_data(self):
-        #print "_new_scan_data"
+        print "_new_scan_data"
         #print "\033[2J"
         #print "\033[0;0H"
         now = time.time()
         if now < self.initial_inhibit_end:
-            #print "inhibited"
+            print "inhibited"
             return
         for iface in self.interfaces:
             cur_assoc = iface.radio_sm.associated.get()
+            print "OK to try reassociating?", iface.iface, iface.radio_sm.scanning_enabled.get(), cur_assoc
             if iface.radio_sm.scanning_enabled.get() and cur_assoc != radio.Associating:
                 # Pick the best bss for this interface.
                 candidate_bsses = filter(self.check_bss_matches_forcing, 
@@ -409,7 +410,7 @@ class RadioManager:
                     print >> radio_manager_decisions, "from unassociated"
                 iface.radio_sm.associate_request.trigger(best_bss.id)
                 self.iface_associations[iface] = best_bss.id
-
+    
     def _dhcp_fail(self, iface):
         print >> radio_manager_decisions, "DHCP failed, taking down", iface.iface
         iface.interface_upper.restart()
