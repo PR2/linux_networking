@@ -18,6 +18,7 @@ import signal
 import interface
 from netlink_monitor import IFSTATE
 from ieee80211_channels.channels import IEEE80211_Channels
+import os
 
 # Make sure states are nice and consistent...
 assert(InterfaceStatus.STATE_NO_INTERFACE == -1)
@@ -27,6 +28,16 @@ assert(IFSTATE.LINK == InterfaceStatus.STATE_LINK)
 assert(IFSTATE.LINK_ADDR == InterfaceStatus.STATE_LINK_ADDR)
 assert(IFSTATE.ADDR == InterfaceStatus.STATE_ADDR)
 assert(InterfaceStatus.STATE_PINGING == 5)
+
+STATUSES = { 
+    InterfaceStatus.STATE_NO_INTERFACE : "Interface not found",
+    InterfaceStatus.STATE_PLUGGED      : "Interface is down", 
+    InterfaceStatus.STATE_UP           : "Interface is up with no link", 
+    InterfaceStatus.STATE_LINK         : "Interface has a link with no address",
+    InterfaceStatus.STATE_LINK_ADDR    : "Interface has a link but no IP address",
+    InterfaceStatus.STATE_ADDR         : "Interface has an IP address but pings are failing",
+    InterfaceStatus.STATE_PINGING      : "Interface is validated",
+}
 
 # FIXME May want to kill this at some point
 import asmach as smach
@@ -53,6 +64,7 @@ class RoamNode:
         self.interface_selector = interface_selector.InterfaceSelector()
         self.reconfig_server = dynamic_reconfigure.server.Server(MultiInterfaceRoamConfig, self.reconfigure)
         self._interfaces = self.interface_selector.interfaces.values()
+        self.hostname = os.uname()[1]
         
         # Prepare topics to publish
         pub_namespace = rospy.remap_name('wifi')
@@ -95,6 +107,58 @@ class RoamNode:
         self.status_pub.publish(msg)
 
         # diagnostics
+        diags = []
+        diags.append(('Tunnel Interface', self.interface_selector.tunnel_interface))
+        if self.interface_selector.active_interfaces and \
+             self.interface_selector.active_interfaces[0].score != self.interface_selector.TERRIBLE_INTERFACE:
+            act_iface = self.interface_selector.active_interfaces[0]
+            diags.append(('Active Interface', act_iface.iface ))
+            diags += act_iface.diags
+            if act_iface.goodness > 95:
+                diag_summary = "Active interface %s running strong"%act_iface.iface
+                diag_level = 0
+            elif act_iface.goodness > 50:
+                diag_summary = "Active interface %s is lossy"%act_iface.iface
+                diag_level = 1
+            else:
+              if act_iface.goodness > 0:
+                diag_summary = "Active interface %s is very poor"%act_iface.iface
+              else:
+                diag_summary = "Active interface %s is failing to ping"%act_iface.iface
+              diag_level = 2
+        else:
+            diags.append(('Active Interface', "none"))
+            diag_summary = 'No active interface'
+            diag_level = 2
+        ds = self.fill_diags("synthetic interface", diag_summary, self.hostname, diags)
+        ds.level = diag_level
+        statuses = [ds]
+
+        for iface in self._interfaces:
+            status = iface.status
+            if status == InterfaceStatus.STATE_ADDR and iface.ping_loss < 100:
+                status = InterfaceStatus.STATE_PINGING
+                diag_summary = "Connected (goodness %f, reliability %f)"%(iface.goodness, iface.reliability)
+            else:
+                diag_summary = STATUSES[status]
+            ds = self.fill_diags(iface.iface, diag_summary, self.hostname, iface.diags)
+            statuses.append(ds)
+
+        da = DiagnosticArray()
+        da.header.stamp = rospy.get_rostime()
+        da.status = statuses
+        self.diag_pub.publish(da)
+    
+    
+    @staticmethod
+    def fill_diags(name, summary, hid, diags):
+        ds = DiagnosticStatus()
+        ds.values = [KeyValue(k, str(v)) for (k, v) in diags]
+        ds.hardware_id = hid
+        ds.name = rospy.get_caller_id().lstrip('/') + ": " + name
+        ds.message = summary
+        return ds
+    
                 
     @staticmethod
     def gen_status_msg(iface):

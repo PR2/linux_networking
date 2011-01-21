@@ -143,11 +143,11 @@ class InterfaceSelector:
         # prescore is used by radio manager to decide which interface to
         # activate.
         
-        if iface.goodness <= 0 and (self.forced_interface != iface.iface):
+        if iface.goodness <= 0 and self.forced_interface != iface.iface:
             iface.prescore = iface.score = InterfaceSelector.TERRIBLE_INTERFACE
             return
 
-        # If the interface an interface is being forced, other interfaces
+        # If an interface is being forced, other interfaces
         # should all have terrible scores.
         if self.forced_interface and self.forced_interface != iface.iface:
             iface.prescore = iface.score = InterfaceSelector.TERRIBLE_INTERFACE
