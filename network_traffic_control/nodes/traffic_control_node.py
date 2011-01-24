@@ -228,6 +228,9 @@ class TrafficControlManager:
         self.config['status'] = 'OK'
         self.config['errmsg'] = ''
 
+        if 'packet_size' not in self.config:
+            self.config['packet_size'] = config['packet_size']
+
         if 1 & level or 4 & level:
             if self.egress_control and config['bandwidth_egress'] == 0.0 and \
                     config['latency_egress'] == 0.0 and config['loss_egress'] == 0.0:
