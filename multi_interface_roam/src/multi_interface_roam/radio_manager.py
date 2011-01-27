@@ -309,11 +309,12 @@ class RadioManager:
         iface.radio_sm.associated.subscribe(self._associated_cb, iface)
         iface.dhcpdata.error_event.subscribe_repeating(self._dhcp_fail, iface)
     
-    def set_mode(self, ssid="", bssid="", band=0, scan_only=False):
+    def set_mode(self, ssid="", bssid="", band=0, scan_only=False, iface = ""):
         self.scan_only = scan_only
         self.forced_ssid = ssid
         self.forced_bssid = bssid
         self.forced_band = band
+        self.forced_iface = iface
         self.scan_manager.frequencies.bands = band
         for iface in self.interfaces:
             self._check_cur_bss(iface)
@@ -336,6 +337,11 @@ class RadioManager:
             print "but want", self.forced_ssid, self.forced_ssid, self.forced_band
             print "Unassociating because bss does not match requirements."
             iface.radio_sm.unassociate()
+            return
+        if not self.check_iface_matches_forcing(iface):
+            print "Unassociating %s because interface forced to %s"%(iface, self.forced_iface)
+            iface.radio_sm.unassociate()
+            return
 
     def check_bss_matches_forcing(self, bss):
         """Checks that the bss matches the forced bssid, ssid and band."""
@@ -349,6 +355,11 @@ class RadioManager:
             return False
         return True
 
+    def check_iface_matches_forcing(self, iface):
+        if self.forced_iface and self.forced_iface != iface.iface:
+            return False
+        return True
+
     def _new_scan_data(self):
         print "_new_scan_data"
         #print "\033[2J"
@@ -358,6 +369,9 @@ class RadioManager:
             print "inhibited"
             return
         for iface in self.interfaces:
+            if not self.check_iface_matches_forcing(iface):
+                continue
+
             cur_assoc = iface.radio_sm.associated.get()
             #print "OK to try reassociating?", iface.iface, iface.radio_sm.scanning_enabled.get(), cur_assoc
             if iface.radio_sm.scanning_enabled.get() and cur_assoc != radio.Associating:
