@@ -92,6 +92,7 @@ class InterfaceSelector:
 
     @mainThreadCallback
     def set_mode(self, ssid = "", bssid = "", sel_interface = "", use_tunnel = True, band = 3, scan_only = False):
+        print >> sys.stderr, "Dynamic reconfiguration ssid: %s bssid: %s iface: %s tun: %s band: %s scan_only: %s"%(ssid, bssid, sel_interface, use_tunnel, band, scan_only)
         self.goodness_weight = config.get_parameter('ping_weighting', 0.5)
         self.radio_manager.set_mode(ssid, bssid, band, scan_only, sel_interface)
         self.forced_interface = sel_interface
