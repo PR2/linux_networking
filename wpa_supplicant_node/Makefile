@@ -1,15 +1,14 @@
 PACKAGE_DIR=$(shell pwd)
 PACKAGE=$(notdir $(PACKAGE_DIR))
 
-my_all: 
-	make -C wpa_supplicant/wpa_supplicant libwpa_supplicant.so wpa_supplicant.pc
-	make all
+include $(shell rospack find mk)/cmake.mk
 
-test: my_all
+all: libwpa_supplicant
+clean: libwpa_supplicant_clean
 
-clean: my_clean
-
-my_clean:
+libwpa_supplicant_clean:
 	make -C wpa_supplicant/wpa_supplicant clean
 
-include $(shell rospack find mk)/cmake.mk
+libwpa_supplicant:
+	make -C wpa_supplicant/wpa_supplicant libwpa_supplicant.so wpa_supplicant.pc
+
