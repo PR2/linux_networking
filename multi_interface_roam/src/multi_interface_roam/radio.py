@@ -104,7 +104,7 @@ class Radio:
 
     @mainThreadCallback
     def _assoc_feedback_cb(self, fbk):
-        print "_assoc_feedback_cb", self.interface_name, fbk.associated, fbk.associating
+        print "_assoc_feedback_cb", self.interface_name, fbk.associated
         if fbk.associated:
             self.associated.set(fbk.bss)
 
