@@ -34,7 +34,7 @@ class InterfaceSelector:
         self.inactive_penalty = config.get_parameter('inactive_penalty', 50)
         self.forced_interface = ""
         self.tunnel_interface = config.get_parameter('tunnel_interface', "")
-        self.use_tunnel = bool(tunnel_interface) # Don't use tunnel if not set.
+        self.use_tunnel = True
         self.active_interfaces = []
 
         print "Resolving basestation IP. (Blocking operation.)"
@@ -97,10 +97,11 @@ class InterfaceSelector:
         self.radio_manager.set_mode(ssid, bssid, band, scan_only, sel_interface)
         self.forced_interface = sel_interface
         self.use_tunnel = use_tunnel
-        if use_tunnel:
-            self.vpn_rule.set('lookup', str(RULEID.DEFAULT))
-        else:
-            self.vpn_rule.set()
+        if self.vpn_rule:
+            if use_tunnel:
+                self.vpn_rule.set('lookup', str(RULEID.DEFAULT))
+            else:
+                self.vpn_rule.set()
 
     def _refresh_default_route(self, old_state, new_state):
         if new_state:
