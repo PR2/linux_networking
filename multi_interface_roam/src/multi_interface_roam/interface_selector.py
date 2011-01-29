@@ -33,8 +33,8 @@ class InterfaceSelector:
         self.radio_manager = radio_manager.RadioManager()
         self.inactive_penalty = config.get_parameter('inactive_penalty', 50)
         self.forced_interface = ""
-        self.use_tunnel = True
         self.tunnel_interface = config.get_parameter('tunnel_interface', "")
+        self.use_tunnel = bool(tunnel_interface) # Don't use tunnel if not set.
         self.active_interfaces = []
 
         print "Resolving basestation IP. (Blocking operation.)"

@@ -204,6 +204,8 @@ class RoamNode:
             config['bssid'] = ""
         else:
             bssid = mac_addr.str_to_packed(config['bssid'])
+        if not self.interface_selector.tunnel_interface:
+            config['use_tunnel'] = False
         use_tunnel = config['use_tunnel']
 
         self.interface_selector.set_mode(ssid, bssid, interface, use_tunnel, config['band'], config['scan_only'])
