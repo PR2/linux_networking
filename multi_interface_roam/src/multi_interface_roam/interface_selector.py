@@ -97,7 +97,7 @@ class InterfaceSelector:
         self.radio_manager.set_mode(ssid, bssid, band, scan_only, sel_interface)
         self.forced_interface = sel_interface
         self.use_tunnel = use_tunnel
-        if self.vpn_rule:
+        if self.tunnel_interface:
             if use_tunnel:
                 self.vpn_rule.set('lookup', str(RULEID.DEFAULT))
             else:
