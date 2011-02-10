@@ -13,6 +13,7 @@ import time
 import traceback
 import ipaddr
 import state_publisher
+import config
 
 # FIXME Add support for multiple leases.
 # FIXME Add a way to signal x amount of time before we lose the lease.
@@ -32,7 +33,7 @@ class DhcpData:
         self.error_timeout = 5
         self.exp_backoff_min = 0.2
         self.exp_backoff_max = 0.5
-        self.exp_backoff_timeout = 2
+        self.exp_backoff_timeout = config.get_parameter('dhcp_timeout', 2)
         self.leases = {}
 
     def start_socket(self):
