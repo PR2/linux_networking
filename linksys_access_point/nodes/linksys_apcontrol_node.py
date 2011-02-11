@@ -323,7 +323,7 @@ if __name__ == "__main__":
 
     ip = rospy.get_param("~ip", "192.168.1.1") 
     user = rospy.get_param("~user", "") 
-    password = rospy.get_param("~pass", "admin") 
+    password = rospy.get_param("~password", "admin") 
     interface = rospy.get_param("~interface", "wl0")
 
     ap = LinksysApControl(ip, user, password, interface)
