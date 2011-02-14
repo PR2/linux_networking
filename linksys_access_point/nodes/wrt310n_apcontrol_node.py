@@ -11,7 +11,7 @@ import dynamic_reconfigure.server
 from access_point_control.cfg import ApControlConfig
 from ieee80211_channels.channels import IEEE80211_Channels
 
-class LinksysApControl:
+class LinksysWRT310NApControl:
 
     def __init__(self, hostname, username, password, interface):
         self.hostname = hostname
@@ -35,10 +35,12 @@ class LinksysApControl:
         self.set_req_args["action"] = "Apply"
         self.set_req_args["submit_type"] = ""
         self.set_req_args["change_action"] = ""
+        self.set_req_args["change_status"] = "0"
         self.set_req_args["commit"] = "1"
+        self.set_req_args["nvset_cgi"] = "wireless"
         self.set_req_args["next_page"] = ""
 
-        self.avail_txpower_list = self.get_avail_txpower_list()
+        print self.current_config
 
         node_name = rospy.get_name()
         for param_name in self.current_config:
@@ -84,24 +86,14 @@ class LinksysApControl:
 
         return html
 
-    def get_avail_txpower_list(self):
-       html = self.get_page_info("Wireless_Advanced")
-       out_list = re.findall("(?s)name=\"%s_txpwr.*?Array\((\"\d+\".*?)\)"%(self.interface), html)
-       txpwr_list = re.findall("\"(\d+)\"", out_list[0])
-       txpwr_list_mw = [ int(el) for el in txpwr_list ]
-       return [ (self.mw_to_dbm(el), el) for el in txpwr_list_mw ]
 
     def get_wireless_basic_params(self):
         # mode & ssid & channel
         html = self.get_page_info("Wireless_Basic")
-        
+
         mode_out = re.findall("(?s)name=\"%s_net_mode.*?_net_mode = '(.*?)'"%(self.interface), html)
         ssid_out = re.findall("value='(.*)' name=\"%s_ssid\""%(self.interface), html)
-        if self.interface == "wl0":
-            expression = "(?s)InitValue\(passForm.*?var ch = '(\d+)'"
-        else:
-            expression = "(?s)InitValue\(passForm.*?var ch_1 = '(\d+)'"
-        channel_out = re.findall(expression, html)
+        channel_out = re.findall("var %s_channel = '(\d+)'"%(self.interface), html)
 
         if (not mode_out) or (not ssid_out) or (not channel_out):
             raise Exception("Could not read interface " + self.interface + " mode or ssid or channel. " +
@@ -110,19 +102,18 @@ class LinksysApControl:
         return mode_out[0], ssid_out[0], int(channel_out[0])
 
     def get_wireless_advanced_params(self):
-        # bitrate & txpower
+        # bitrate 
         html = self.get_page_info("Wireless_Advanced")
 
         bitrate_out = re.findall("(?s)name=\"%s_rate.*?value=\"(\d+)\" selected"%(self.interface), html)
-        txpower_out = re.findall("(?s)name=\"%s_txpwr.*?wl_txpwr = '(\d+)'"%(self.interface), html)
 
-        return int(bitrate_out[0]), int(txpower_out[0])
+        return int(bitrate_out[0])
 
     def get_wireless_security_params(self):
         # encryption_mode | encryption_pass
         html = self.get_page_info("WL_WPATable")
 
-        encryption_mode_out = re.findall("(?s)name=%s_security_mode.*?var security_mode = '(.*?)'"%(self.interface), html)
+        encryption_mode_out = re.findall("var security_mode2 = '(.*?)'", html)
 
         if re.search("wpa2?_personal", encryption_mode_out[0]):
             encryption_mode = re.findall("(.*)_.*", encryption_mode_out[0])[0]
@@ -152,10 +143,7 @@ class LinksysApControl:
 
     def get_current_config(self):
         mode, ssid, channel = self.get_wireless_basic_params()
-        if self.interface == "wl0":
-            band = IEEE80211_Channels.BAND_2400_MHz
-        else:
-            band = IEEE80211_Channels.BAND_5000_MHz
+        band = IEEE80211_Channels.BAND_2400_MHz
         
         self.current_config['ssid'] = ssid
         self.current_config['freq'] = float(IEEE80211_Channels.get_freq(channel, band))
@@ -181,10 +169,10 @@ class LinksysApControl:
             self.current_config['mode'] = "unknown"
             self.current_config['ieee80211n'] = False
 
-        self.current_config['bitrate'], txpower = self.get_wireless_advanced_params()
+        self.current_config['bitrate'] = self.get_wireless_advanced_params()
 
-        self.current_config['txpower_auto'] = False
-        self.current_config['txpower'] = self.mw_to_dbm(txpower)
+        self.current_config['txpower_auto'] = True
+        self.current_config['txpower'] = 0
 
         self.current_config['encryption_mode'], self.current_config['encryption_pass'] = \
                 self.get_wireless_security_params()
@@ -197,12 +185,13 @@ class LinksysApControl:
             args["%s_ssid"%(self.interface)] = ssid
         args["%s_net_mode"%(self.interface)] = if_mode
         if channel is not None:
+            args["%s_schannel"%(self.interface)] = channel
             args["%s_channel"%(self.interface)] = channel
+        print args
         self.apply_request(args, "Wireless_Basic")
 
-    def set_wireless_advanced(self, bitrate, txpower):
+    def set_wireless_advanced(self, bitrate):
         args = {}
-        args["%s_txpwr"%(self.interface)] = txpower
         args["%s_rate"%(self.interface)] = bitrate
         self.apply_request(args, "Wireless_Advanced")
 
@@ -210,9 +199,9 @@ class LinksysApControl:
         args = {}
 
         if encryption_mode == ApControlConfig.ApControl_open:
-            args["%s_security_mode"%(self.interface)] = "disabled"
+            args["security_mode2"] = "disabled"
         elif encryption_mode == ApControlConfig.ApControl_wep:
-            args["%s_security_mode"%(self.interface)] = "wep"
+            args["security_mode2"] = "wep"
             args["%s_WEP_key"%(self.interface)] = ""
             args["%s_wep"%(self.interface)] = "restricted"
             args["%s_key"%(self.interface)] = "1"
@@ -221,19 +210,19 @@ class LinksysApControl:
         elif encryption_mode in [ApControlConfig.ApControl_wpa,\
                 ApControlConfig.ApControl_wpa2]:
             if encryption_mode == ApControlConfig.ApControl_wpa:
-                args["%s_security_mode"%(self.interface)] = "wpa_personal"
-                args["%s_crypto"%(self.interface)] = "tkip" 
+                args["security_mode2"] = "wpa_personal"
+#                args["%s_crypto"%(self.interface)] = "tkip" 
             elif encryption_mode == ApControlConfig.ApControl_wpa2:
-                args["%s_security_mode"%(self.interface)] = "wpa2_personal"
-                args["%s_crypto"%(self.interface)] = "tkip" 
+                args["security_mode2"] = "wpa2_personal"
+#                args["%s_crypto"%(self.interface)] = "tkip" 
             args["%s_wpa_gtk_rekey"%(self.interface)] = "3600"
             args["%s_wpa_psk"%(self.interface)] = encryption_pass
         elif encryption_mode in [ApControlConfig.ApControl_wpa_enterprise,\
                 ApControlConfig.ApControl_wpa2_enterprise]:
             if encryption_mode == ApControlConfig.ApControl_wpa_enterprise:
-                args["%s_security_mode"%(self.interface)] = "wpa_enterprise"
+                args["security_mode2"] = "wpa_enterprise"
             else:
-                args["%s_security_mode"%(self.interface)] = "wpa2_enterprise"
+                args["security_mode2"] = "wpa2_enterprise"
             args["%s_wpa_gtk_rekey"%(self.interface)] = "3600"
             args["%s_radius_key"%(self.interface)] = encryption_pass
         elif encryption_mode == ApControlConfig.ApControl_wpa_wpa2:
@@ -258,7 +247,7 @@ class LinksysApControl:
             return
         
         if read_config['enabled']:
-            for prop in ['mode', 'ssid', 'freq', 'ieee80211n', 'txpower', 'bitrate', 'wmm', 'encryption_mode']:
+            for prop in ['mode', 'ssid', 'freq', 'ieee80211n', 'bitrate', 'wmm', 'encryption_mode']:
                 if requested_config[prop] != read_config[prop]:
                     self.current_config['status'] = "FAIL"
                     self.current_config['errmsg'] += "Could not set %s, wrote %s, read %s"% \
@@ -297,18 +286,14 @@ class LinksysApControl:
                 change = True
 
             # bitrate & txpower
-            if config['txpower'] != self.current_config['txpower'] or \
-                    config['bitrate'] != self.current_config['bitrate']:
-                # find closest available tx power
-                min_abs_diff = abs(config['txpower'] - self.avail_txpower_list[0][0])
-                for i in range(0, len(self.avail_txpower_list)):
-                    avail_power_dbm = self.avail_txpower_list[i][0]
-                    if abs(config['txpower'] - avail_power_dbm) <= min_abs_diff:
-                        min_abs_diff = abs(config['txpower'] - avail_power_dbm)
-                        closest_power_idx = i
-                config['txpower'] = self.avail_txpower_list[closest_power_idx][0]
-                self.set_wireless_advanced(config["bitrate"], self.avail_txpower_list[closest_power_idx][1])
+            if config['bitrate'] != self.current_config['bitrate']:
+                self.set_wireless_advanced(config["bitrate"])
                 change = True
+
+            for prop in [ 'txpower', 'txpower_auto' ]:
+                if config[prop] != self.current_config[prop]:
+                    self.current_config['status'] = "FAIL"
+                    self.current_config['errmsg'] = "WRT310N does not support TX power control"
 
             # wmm
             if config['wmm'] != self.current_config['wmm']:
@@ -341,9 +326,9 @@ if __name__ == "__main__":
     ip = rospy.get_param("~ip", "192.168.1.1") 
     user = rospy.get_param("~user", "") 
     password = rospy.get_param("~password", "admin") 
-    interface = rospy.get_param("~interface", "wl0")
+    interface = rospy.get_param("~interface", "wl")
 
-    ap = LinksysApControl(ip, user, password, interface)
+    ap = LinksysWRT310NApControl(ip, user, password, interface)
 
     dynamic_reconfigure.server.Server(ApControlConfig, ap.reconfigure)
 
