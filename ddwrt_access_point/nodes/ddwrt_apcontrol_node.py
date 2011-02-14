@@ -49,6 +49,12 @@ class DdwrtApControl:
         self.current_config = {}
         self.get_current_config()
 
+        node_name = rospy.get_name()
+        for param_name in self.current_config:
+            param_full_name = node_name + "/" + param_name
+            if not rospy.has_param(param_full_name):
+                rospy.set_param(param_full_name, self.current_config[param_name])
+
     def mw_to_dbm(self, mw):
         return int(10 * math.log10(float(mw)) + 0.5)
 
