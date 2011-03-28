@@ -198,7 +198,7 @@ class MonitorSource :
                 if magic != self.magic or (self.source_id is not None and self.source_id != source_id) :
                     continue
                 self.process_rcvd_packet(send_time, echo_time, recv_time, seq_num)
-            except socket.timeout:
+            except:
                 pass
         #print "Udp monitor recv_thread finished shut down"
 
