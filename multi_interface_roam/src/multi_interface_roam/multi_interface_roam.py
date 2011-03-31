@@ -39,7 +39,7 @@ LOCAL_RULE=50
 FIRST_IFACE_RULE=100
 TUNNEL_RULE2=75
 TUNNEL_RULE=150
-BLOCK_TUNNEL_RULE=175
+BLACKHOLE_BASESTATION_RULE=175
 DEFAULT_RULE=200
 BLOCK_NON_TUNNEL_RULE=250
         
@@ -809,35 +809,37 @@ class WiredInterface(DhcpInterface):
         self.initialized = False
         DhcpInterface.shutdown(self)
 
-class PacketMarker:
-    def __init__(self, basestation):
-        print "Initializing PacketMarker."
-        self.basestation = basestation
-        self.rules = []
-        # Packets for the VPN get a mark of 1.
-        self.rules.append("OUTPUT -t mangle -d %s -p udp --dport 1194 -j MARK --set-mark 1"%basestation)
-        # Packets for the ping check get a mark of 2.
-        self.rules.append("OUTPUT -t mangle -d %s -p udp --dport 6868 -j MARK --set-mark 2"%basestation)
-        self.playrules("-D", True)
-        self.playrules("-A", False)
-        print "PacketMarker initialized."
+# class PacketMarker:
+#     def __init__(self, basestation):
+#         print "Initializing PacketMarker."
+#         self.basestation = basestation
+#         self.rules = []
+#         # Packets for the VPN get a mark of 1.
+#         self.rules.append("OUTPUT -t mangle -d %s -p udp --dport 1194 -j MARK --set-mark 1"%basestation)
+#         # Packets for the ping check get a mark of 2.
+#         self.rules.append("OUTPUT -t mangle -d %s -p udp --dport 6868 -j MARK --set-mark 2"%basestation)
+#         self.playrules("-D", True)
+#         self.playrules("-A", False)
+#         print "PacketMarker initialized."
 
-    def playrules(self, command, repeat):
-        for rule in self.rules:
-            while True:
-                if System("iptables %s %s"%(command, rule)).errcode:
-                    break
-                if not repeat:
-                    break
+#     def playrules(self, command, repeat):
+#         for rule in self.rules:
+#             while True:
+#                 if System("iptables %s %s"%(command, rule)).errcode:
+#                     break
+#                 if not repeat:
+#                     break
 
-    def shutdown(self):
-        self.playrules("-D", False)
+#     def shutdown(self):
+#         self.playrules("-D", False)
 
 class RoutingRules:
-    def __init__(self, numinterfaces, localnets, tuniface): 
+    def __init__(self, numinterfaces, localnets, tuniface, basestation): 
         self.numinterfaces = numinterfaces
         self.tuniface = tuniface
         self.flushall()
+
+        System("ip rule add priority %i to %s blackhole"%(BLACKHOLE_BASESTATION_RULE, basestation))
 
         #System("ip rule add priority %i fwmark 1 table %i"%(BLOCK_TUNNEL_RULE,BLOCK_NON_TUNNEL_RULE))
         #flushiprule(BLOCK_TUNNEL_RULE, True)
@@ -862,6 +864,7 @@ class RoutingRules:
             flushiprule(TUNNEL_RULE + i)
         flushiprule(DEFAULT_RULE)
         flushiprule(LOCAL_RULE)
+        flushiprule(BLACKHOLE_BASESTATION_RULE)
         #flushiprule(TUNNEL_RULE2)
         #flushiprule(BLOCK_TUNNEL_RULE, True)
         #flushiprule(BLOCK_NON_TUNNEL_RULE, True)
@@ -901,10 +904,10 @@ class NetworkSelector:
         KillServices()
         global netlink_monitor
         netlink_monitor = NetlinkMonitor()
-        self.pkt_marker = PacketMarker(self.base_station)
+        #self.pkt_marker = PacketMarker(self.base_station)
         ConfigureArp()
         ConfigureRpFilter('all')
-        self.routing_rules = RoutingRules(len(interfaces_config), local_networks, self.tunnel_interface)
+        self.routing_rules = RoutingRules(len(interfaces_config), local_networks, self.tunnel_interface, self.base_station)
         self.interfaces = []
         self.active_iface = -1
         self._tunnel_rules = {}
@@ -965,7 +968,7 @@ class NetworkSelector:
                 safe_shutdown(iface.shutdown)
         safe_shutdown(netlink_monitor.shutdown)
         #print "Shutting down packet marker."
-        safe_shutdown(self.pkt_marker.shutdown)
+        #safe_shutdown(self.pkt_marker.shutdown)
         #print "Shutting down routing rules."
         safe_shutdown(self.routing_rules.shutdown)
 
