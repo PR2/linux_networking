@@ -2,7 +2,7 @@
 import roslib; roslib.load_manifest('test_ros') # FIXME
 import rospy
 import std_msgs.msg
-import roslib.masterapi
+import rosgraph.masterapi
 
 try:
     import rospy.masterslave as masterslave
@@ -44,7 +44,7 @@ def check_master():
                 raise Exception
         except:
             try:
-                master = roslib.masterapi.Master(rospy.get_name())
+                master = rosgraph.masterapi.Master(rospy.get_name())
                 for (name, type) in pub_list.iteritems():
                     master.registerPublisher(name, type, our_uri)
                 master_pid = master.getPid()
