@@ -13,7 +13,8 @@
 #include <wpa_supplicant_node/SetNetworkParameters.h>
 #include <wpa_supplicant_node/NetworkList.h>
 #include <wpa_supplicant_node/FrequencyList.h>
- 
+#include <wpa_supplicant_node/SecurityProperties.h>
+
 extern "C" {
 #include <includes.h>
 #include <common.h>
@@ -26,6 +27,7 @@ extern "C" {
 #include <common/wpa_common.h>
 #include <common/ieee802_11_defs.h>
 #include "wpa_supplicant_node.h"
+#include <rsn_supp/wpa.h>
 }
 
 typedef boost::function<void ()> WorkFunction;
@@ -542,6 +544,47 @@ private:
     requestAssociateWork();
   }
   
+  void fillSecurityInformation(wpa_supplicant_node::SecurityProperties &props, struct wpa_ie_data &ie_data)
+  {
+      // key_mgmt
+      if (ie_data.key_mgmt & WPA_KEY_MGMT_PSK)
+          props.key_mgmt.push_back("wpa-psk");
+      if (ie_data.key_mgmt & WPA_KEY_MGMT_FT_PSK)
+          props.key_mgmt.push_back("wpa-ft-psk");
+      if (ie_data.key_mgmt & WPA_KEY_MGMT_PSK_SHA256)
+          props.key_mgmt.push_back("wpa-psk-sha256");
+      if (ie_data.key_mgmt & WPA_KEY_MGMT_IEEE8021X)
+          props.key_mgmt.push_back("wpa-eap");
+      if (ie_data.key_mgmt & WPA_KEY_MGMT_FT_IEEE8021X)
+          props.key_mgmt.push_back("wpa-ft-eap");
+      if (ie_data.key_mgmt & WPA_KEY_MGMT_IEEE8021X_SHA256)
+          props.key_mgmt.push_back("wpa-eap-sha256");
+      if (ie_data.key_mgmt & WPA_KEY_MGMT_NONE)
+          props.key_mgmt.push_back("wpa-none");
+      
+      // group
+      switch (ie_data.group_cipher) {
+      case WPA_CIPHER_WEP40:
+          props.group.push_back("wep40");
+          break;
+      case WPA_CIPHER_TKIP:
+          props.group.push_back("tkip");
+          break;
+      case WPA_CIPHER_CCMP:
+          props.group.push_back("ccmp");
+          break;
+      case WPA_CIPHER_WEP104:
+          props.group.push_back("wep104");
+          break;
+      }
+      
+      // pairwise
+      if (ie_data.pairwise_cipher & WPA_CIPHER_TKIP)
+          props.pairwise.push_back("tkip");
+      if (ie_data.pairwise_cipher & WPA_CIPHER_CCMP)
+          props.pairwise.push_back("ccmp");
+  }
+
   void fillRosBss(wpa_supplicant_node::Bss &ros_bss, wpa_bss &bss)
   {
     ros_bss.stamp = ros::Time(bss.last_update.sec + 1e-6 * bss.last_update.usec);
@@ -553,6 +596,21 @@ private:
     ros_bss.quality = bss.qual;
     ros_bss.level = bss.level;
     ros_bss.noise = bss.noise;
+
+    struct wpa_ie_data wpa_data;
+    const u8 *ie;
+    // wpa
+    os_memset(&wpa_data, 0, sizeof(wpa_data));
+    ie = wpa_bss_get_vendor_ie(&bss, WPA_IE_VENDOR_TYPE);
+    if (ie)
+        wpa_parse_wpa_ie(ie, 2 + ie[1], &wpa_data);
+    fillSecurityInformation(ros_bss.wpa, wpa_data);
+    // rsn
+    os_memset(&wpa_data, 0, sizeof(wpa_data));
+    ie = wpa_bss_get_ie(&bss, WLAN_EID_RSN);
+    if (ie)
+        wpa_parse_wpa_ie(ie, 2 + ie[1], &wpa_data);
+    fillSecurityInformation(ros_bss.rsn, wpa_data);
   }
   
   void fillRosResp(wpa_supplicant_node::ScanResult &rslt, wpa_scan_results &scan_res)
@@ -575,6 +633,21 @@ private:
       bss.beacon_interval = cur.beacon_int;
       bss.frequency = cur.freq;
       bss.stamp = ros::Time::now() - ros::Duration(cur.age / 1000.0);
+
+      struct wpa_ie_data wpa_data;
+      const u8 *ie;
+      // wpa
+      os_memset(&wpa_data, 0, sizeof(wpa_data));
+      ie = wpa_scan_get_vendor_ie(&cur, WPA_IE_VENDOR_TYPE);
+      if (ie)
+          wpa_parse_wpa_ie(ie, 2 + ie[1], &wpa_data);
+      fillSecurityInformation(bss.wpa, wpa_data);
+      // rsn
+      os_memset(&wpa_data, 0, sizeof(wpa_data));
+      ie = wpa_scan_get_ie(&cur, WLAN_EID_RSN);
+      if (ie)
+          wpa_parse_wpa_ie(ie, 2 + ie[1], &wpa_data);
+      fillSecurityInformation(bss.rsn, wpa_data);
       rslt.bss.push_back(bss);
     }
   }

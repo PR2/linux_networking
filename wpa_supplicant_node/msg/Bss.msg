@@ -7,6 +7,8 @@ int16 capabilities
 int32 quality
 int32 noise
 int32 level
+SecurityProperties wpa
+SecurityProperties rsn
 
 #InformationElement []ies
 #InformationElement []beacon_ies
