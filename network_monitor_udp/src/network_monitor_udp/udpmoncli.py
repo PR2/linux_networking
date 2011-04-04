@@ -198,8 +198,10 @@ class MonitorSource :
                 if magic != self.magic or (self.source_id is not None and self.source_id != source_id) :
                     continue
                 self.process_rcvd_packet(send_time, echo_time, recv_time, seq_num)
-            except:
+            except socket.timeout:
                 pass
+            except Exception, e:
+                self.exceptions.add(str(e))
         #print "Udp monitor recv_thread finished shut down"
 
     def process_rcvd_packet(self, send_time, echo_time, recv_time, seq_num):
@@ -323,7 +325,7 @@ class Statistics:
 
 class MonitorClient(MonitorSource):
     def __init__(self, latencybins, destaddr, rate, pkt_length, paused = False, sourceaddr = None):
-        MonitorSource.__init__(self, latencybins, destaddr, rate, pkt_length, sourceaddr=sourceaddr, roundtrip = True)
+        MonitorSource.__init__(self, latencybins, destaddr, rate, pkt_length, paused=paused, sourceaddr=sourceaddr, roundtrip = True)
         
   
 if __name__ == "__main__":
