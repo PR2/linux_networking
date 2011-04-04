@@ -1,14 +1,11 @@
 #! /bin/bash
 
 HOME=/root
-. /etc/ros/setup.bash
 rospack profile > /dev/null
 
 ############### EDIT ME ##################
 
 #APP_PATH=""
-
-. /etc/ros/setup.sh
 
 # path to daemon
 DAEMON=`rospack find multi_interface_roam`/nodes/roam_node.py
