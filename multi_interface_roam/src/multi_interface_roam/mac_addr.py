@@ -16,7 +16,7 @@ def to_packed(s):
 def to_str(s):
     if is_str(s):
         return s
-    return packed_to_str(pk)
+    return packed_to_str(s)
 
 def packed_to_str(pk):
     if is_packed(pk):
