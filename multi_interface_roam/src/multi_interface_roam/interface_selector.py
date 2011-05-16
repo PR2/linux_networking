@@ -62,7 +62,7 @@ class InterfaceSelector:
             try:
                 new_iface = self.interfaces[iface] = interface.construct(iface, ifaceid)
                 new_iface.score = InterfaceSelector.TERRIBLE_INTERFACE 
-                new_iface.prescore = InterfaceSelector.TERRIBLE_INTERFACE 
+                new_iface.prescore = InterfaceSelector.TERRIBLE_INTERFACE
                 ifaceid += 1
             except interface.NoType:
                 print >> sys.stderr, "Interface %s has no type."%iface
@@ -168,7 +168,13 @@ class InterfaceSelector:
         # Sort, and forget about the scores
         interfaces.sort(key = lambda iface: iface.score, reverse = True)
         active_interfaces = [ iface for iface in interfaces if iface.score != self.TERRIBLE_INTERFACE ]
-        
+
+        for iface in interfaces:
+            if iface in active_interfaces:
+                iface.rank = active_interfaces.index(iface)
+            else:
+                iface.rank = -1
+
         # Set the interfaces
         self.set_tun_rules(active_interfaces)
 

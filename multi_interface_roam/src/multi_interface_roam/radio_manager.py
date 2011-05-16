@@ -374,6 +374,9 @@ class RadioManager:
 
             cur_assoc = iface.radio_sm.associated.get()
             #print "OK to try reassociating?", iface.iface, iface.radio_sm.scanning_enabled.get(), cur_assoc
+            if cur_assoc and iface == self.best_active:
+                continue
+
             if iface.radio_sm.scanning_enabled.get() and cur_assoc != radio.Associating:
                 # Pick the best bss for this interface.
                 candidate_bsses = filter(self.check_bss_matches_forcing, 
@@ -509,7 +512,7 @@ class RadioManager:
     def desirability(self, target_bss, expiry_time = 0, iface = None):
         #print "desirability", mac_addr.pretty(target_bss.bssid), 
         desirabilities = [bss.level for bss_iface, bss in target_bss.by_iface.iteritems() if bss.stamp.to_sec() > expiry_time and (iface is None or bss_iface == iface)]
-        
+
         if desirabilities:
             # If we are calculating desirability for a particular interface,
             # penalize if another interface is already associating/associated

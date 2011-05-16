@@ -9,6 +9,7 @@ int8 STATE_PINGING = 5       # Ping packets are making it through.
 string pretty_name           # The pretty name of the interface.
 string interface             # The name of the interface.
 int8 state                   # The state (defined above).
+int32 active_interface_rank  # The rank among active interfaces (e.g. 0 for the best active interface) or -1 if inactive
 float32 goodness             # How well this interface is sending packets.
 float32 reliability          # How reliable this interface is expected to be.
 float32 score                # The score use to rank interfaces.

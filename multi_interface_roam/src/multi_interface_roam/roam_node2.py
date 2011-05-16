@@ -168,6 +168,7 @@ class RoamNode:
         msg.state = iface.status
         if msg.state == InterfaceStatus.STATE_ADDR and iface.ping_loss < 100:
            msg.state = InterfaceStatus.STATE_PINGING
+        msg.active_interface_rank = iface.rank
         msg.goodness = iface.goodness
         msg.reliability = iface.reliability
         msg.score = iface.score
