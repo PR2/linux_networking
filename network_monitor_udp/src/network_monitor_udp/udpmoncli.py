@@ -234,20 +234,25 @@ class MonitorSource :
         count = 0
         sum_latency_restricted = 0.
         count_restricted = 0
+
+        missed = 0
         for pkt in arrived:
             (send_time, latency, seq_num) = pkt
             if send_time < window_end:
                 count += 1
                 sum_latency += latency
                 bins[bisect.bisect(self.latencybins, latency)] += 1
-                if send_time >= window_start and seq_num in outstanding:
-                    count_restricted += 1
-                    sum_latency_restricted += latency
+                if seq_num in outstanding:
+                    if latency <= self.latencybins[-2]:
+                        count_restricted += 1
+                        sum_latency_restricted += latency
+                    elif send_time >= window_start:
+                        missed += 1
                 if seq_num in outstanding:
                     del outstanding[seq_num]
             else:
                 self.arrived.append(pkt)
-        missed = 0
+
         for (seq_num, send_time) in outstanding.iteritems():
             if send_time < window_end:
                 missed += 1
