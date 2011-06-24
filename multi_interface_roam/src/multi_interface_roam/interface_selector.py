@@ -12,7 +12,8 @@ import radio_manager
 import logging_config
 import socket
 import system
-from netlink_monitor import netlink_monitor, IFSTATE
+import re
+from netlink_monitor import netlink_monitor, IFSTATE, RunCommand
 from async_helpers import mainThreadCallback
 
 summary_logger = logging_config.get_logger_stream_for_file('console.summary')
@@ -102,6 +103,15 @@ class InterfaceSelector:
                 self.vpn_rule.set('lookup', str(RULEID.DEFAULT))
             else:
                 self.vpn_rule.set()
+
+    def set_country_code(self, country_code):
+        cmd = RunCommand('iw', 'reg', 'set', country_code)
+
+    def get_country_code(self):
+        cmd = RunCommand('iw', 'reg', 'get')
+        m = re.search("[Cc]ountry.*(\w\w):", cmd.stdout)
+        country_code = m.group(1) if m else ""
+        return country_code
 
     def _refresh_default_route(self, old_state, new_state):
         if new_state:
