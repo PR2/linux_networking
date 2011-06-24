@@ -213,7 +213,6 @@ class RoamNode:
 
         if config['country_code'] != self.interface_selector.get_country_code():
             self.interface_selector.set_country_code(config['country_code'])
-        print "COUNTRY CODE:", self.interface_selector.get_country_code()
         config['country_code'] = self.interface_selector.get_country_code()
 
         return config
