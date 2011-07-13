@@ -10,6 +10,7 @@
   <depend package="roscpp"/>
   <depend package="actionlib"/>
   <depend package="actionlib_msgs"/>
+  <depend package="dynamic_reconfigure"/>
   <rosdep name="libpcsclite-dev"/>
   <rosdep name="libnl-dev"/>
   <rosdep name="libreadline-dev"/>

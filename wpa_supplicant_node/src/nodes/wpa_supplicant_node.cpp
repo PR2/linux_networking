@@ -2,9 +2,12 @@
 #include <boost/thread.hpp>
 #include <actionlib/server/action_server.h>
 #include <actionlib_msgs/GoalStatus.h>
+#include <dynamic_reconfigure/server.h>
 #include <unistd.h>
 #include <fcntl.h>
-#include <queue>                  
+#include <string.h>
+#include <queue>
+#include <algorithm>                  
 #include <wpa_supplicant_node/ScanAction.h>
 #include <wpa_supplicant_node/AssociateAction.h>
 #include <wpa_supplicant_node/AddNetwork.h>
@@ -14,11 +17,13 @@
 #include <wpa_supplicant_node/NetworkList.h>
 #include <wpa_supplicant_node/FrequencyList.h>
 #include <wpa_supplicant_node/SecurityProperties.h>
+#include <wpa_supplicant_node/WpaSupplicantNodeConfig.h>
 
 extern "C" {
 #include <includes.h>
 #include <common.h>
 #include <wpa_supplicant_i.h>
+#include <driver_i.h>
 #include <eloop.h>
 #include <drivers/driver.h>
 #include <scan.h>
@@ -32,6 +37,8 @@ extern "C" {
 
 typedef boost::function<void ()> WorkFunction;
 
+void reconfigure(wpa_supplicant_node::WpaSupplicantNodeConfig &config, unsigned int& level);
+
 static class RosApi {
   //int eloop_pid_;
   bool initialized_;
@@ -42,6 +49,9 @@ static class RosApi {
   int pipefd[2];
   boost::shared_ptr<boost::thread> ros_spin_loop_;
   volatile bool shutting_down_;
+
+private:
+  bool first_call_to_reconfigure;
 
 public:
   boost::mutex mutex_;
@@ -112,17 +122,27 @@ public:
     ROS_INFO("pipefds: %i <- %i", pipefd[0], pipefd[1]);
     
     ros::init(*argc, *argv, "wpa_supplicant", ros::init_options::NoSigintHandler);
+
+    static dynamic_reconfigure::Server<wpa_supplicant_node::WpaSupplicantNodeConfig> srv;
+    static dynamic_reconfigure::Server<wpa_supplicant_node::WpaSupplicantNodeConfig>::CallbackType f;
+    f = boost::bind(&RosApi::reconfigure, this, _1, _2);
+
+    first_call_to_reconfigure = true;
+    srv.setCallback(f);
+    first_call_to_reconfigure = false;
+    
     ros_spin_loop_.reset(new boost::thread(boost::bind(&ros::spin)));
 
     return 0;
   }
- 
+
 private:
+  void reconfigure(wpa_supplicant_node::WpaSupplicantNodeConfig &config, unsigned int& level);
+
   void waitForMainThreadState(boost::mutex::scoped_lock &lock, main_thread_states target)
   {
     while (main_thread_state_ != target && !shutting_down_)
     {
-      main_thread_cv_.notify_one();
       main_thread_cv_.wait(lock);
     }
   }
@@ -132,7 +152,8 @@ private:
     if (main_thread_state_ == MAIN_THREAD_WAITING)
     {
       main_thread_state_ = MAIN_THREAD_PAUSED;
-      waitForMainThreadState(lock, MAIN_THREAD_PAUSED);
+      main_thread_cv_.notify_all();
+      waitForMainThreadState(lock, MAIN_THREAD_NOT_WAITING);
     }
   }
 
@@ -140,8 +161,10 @@ public:
   bool waitForMainThread(boost::mutex::scoped_lock &lock)
   { // Call with mutex_ held. Returns with main thread waiting.
     main_thread_state_ = MAIN_THREAD_WAITING;
+    triggerWork();
     waitForMainThreadState(lock, MAIN_THREAD_PAUSED);
     main_thread_state_ = MAIN_THREAD_NOT_WAITING;
+    main_thread_cv_.notify_all();
     return !shutting_down_;
   }
   
@@ -178,6 +201,9 @@ const AssociateActionServer::GoalHandle null_associate_goal_handle_;
 
 struct ros_interface
 {
+  static char country_code[2];
+  static struct wpa_global *global;
+
 private:
   wpa_supplicant *wpa_s_;
   
@@ -227,9 +253,34 @@ public:
     association_publisher_ = nh_.advertise<wpa_supplicant_node::AssociateFeedback>("association_state", 1, true);
     scan_publisher_ = nh_.advertise<wpa_supplicant_node::ScanResult>("scan_results", 1, true);
 
-    publishFrequencyList();
+    if (!ros_interface::global)
+      {
+        ros_interface::global = wpa_s->global;
+        ROS_INFO("calling setDriverCountry");
+        setDriverCountry();
+      }
+    
+    eloop_register_timeout(10, 0, delayedPublishFrequencyList, wpa_s, wpa_s);
     publishNetworkList();
     publishUnassociated();
+  }
+
+  static void setCountryCode(const char *country_code)
+  {
+    if (strlen(country_code) != 2)
+      {
+        ROS_ERROR("Invalid country code %s", country_code);
+        return;
+      }
+
+    ros_interface::country_code[0] = country_code[0];
+    ros_interface::country_code[1] = country_code[1];
+    
+    if (global && global->ifaces && global->ifaces->ros_api)
+      {
+        global->ifaces->ros_api->setDriverCountry();
+        eloop_register_timeout(0, 100000, delayedPublishFrequencyList, global->ifaces, NULL);
+      }
   }
 
   void publishUnassociated()
@@ -348,24 +399,86 @@ public:
     network_list_publisher_.publish(netlist);
   }
 
-private:       
+private:
+  void setDriverCountry()
+  {
+    if (!ros_interface::country_code[0])
+      return;
+
+    wpa_s_->conf->country[0] = ros_interface::country_code[0];
+    wpa_s_->conf->country[1] = ros_interface::country_code[1];
+
+    if (wpa_drv_set_country(wpa_s_, wpa_s_->conf->country))
+      {
+        ROS_ERROR("Failed to set driver country code %s", ros_interface::country_code);
+        return;
+      }
+
+    struct wpa_supplicant *wpa_s_iter = wpa_s_->next;
+    
+    while (wpa_s_iter)
+      {
+        if (wpa_s_iter->ros_api)
+          eloop_register_timeout(0, 100000, delayedPublishFrequencyList, wpa_s_iter, NULL);
+        wpa_s_iter = wpa_s_iter->next;
+      }
+  }
+
+  static void delayedPublishFrequencyList(void *wpa_s, void *repeat_p)
+  {
+    ((wpa_supplicant *) wpa_s)->ros_api->publishFrequencyList();
+
+    if (repeat_p != NULL)
+      eloop_register_timeout(10, 0, delayedPublishFrequencyList, wpa_s, repeat_p);
+  }
+
   void publishFrequencyList()
   {
-    // FIXME This should be determined in a more general way.
-
     wpa_supplicant_node::FrequencyList f;
-    for (int i = 2412; i <= 2462; i += 5)
-      f.frequencies.push_back(i);
-    for (int i = 5180; i <= 5320; i += 20)
-      f.frequencies.push_back(i);
-    for (int i = 5500; i <= 5580; i += 20)
-      f.frequencies.push_back(i);
-    for (int i = 5500; i <= 5580; i += 20)
-      f.frequencies.push_back(i);
-    for (int i = 5680; i <= 5700; i += 20)
-      f.frequencies.push_back(i);
-    for (int i = 5745; i <= 5825; i += 20)
-      f.frequencies.push_back(i);
+
+    uint16_t num_modes, flags;
+    struct hostapd_hw_modes *modes; 
+
+    modes = wpa_drv_get_hw_feature_data(wpa_s_, &num_modes, &flags);
+    
+    if (modes != NULL)
+      {
+        for (struct hostapd_hw_modes *mode = modes; mode < modes + num_modes; mode++)
+          {
+            if (mode->channels)
+              {
+                for (struct hostapd_channel_data *channel = mode->channels; 
+                     channel < mode->channels + mode->num_channels;
+                     channel++)
+                  {
+                    if (!(channel->flag & HOSTAPD_CHAN_DISABLED) && 
+                        std::find(f.frequencies.begin(), f.frequencies.end(), channel->freq) == f.frequencies.end())
+                      {
+                        f.frequencies.push_back(channel->freq);
+                      }
+                  }
+                free(mode->channels);
+              }
+            if (mode->rates)
+              free(mode->rates);
+          }
+        free(modes);
+      }
+    else
+      {
+        for (int i = 2412; i <= 2462; i += 5)
+          f.frequencies.push_back(i);
+        for (int i = 5180; i <= 5320; i += 20)
+          f.frequencies.push_back(i);
+        for (int i = 5500; i <= 5580; i += 20)
+          f.frequencies.push_back(i);
+        for (int i = 5500; i <= 5580; i += 20)
+          f.frequencies.push_back(i);
+        for (int i = 5680; i <= 5700; i += 20)
+          f.frequencies.push_back(i);
+        for (int i = 5745; i <= 5825; i += 20)
+          f.frequencies.push_back(i);
+      }
 
     frequency_list_publisher_.publish(f);
   }
@@ -805,6 +918,22 @@ private:
     lockedScanTryActivate();
   }
 };
+
+struct wpa_global *ros_interface::global = NULL;
+char ros_interface::country_code[2] = {0, 0};
+
+void RosApi::reconfigure(wpa_supplicant_node::WpaSupplicantNodeConfig &config, unsigned int& level)
+{
+  boost::mutex::scoped_lock lock(mutex_);
+  
+  if (!first_call_to_reconfigure)
+    {
+      if (!waitForMainThread(lock))
+        return; 
+    }
+
+  ros_interface::setCountryCode(config.country_code.c_str());
+}
 
 extern "C" {
 

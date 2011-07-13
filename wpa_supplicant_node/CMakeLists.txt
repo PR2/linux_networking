@@ -35,6 +35,11 @@ rosbuild_gensrv()
 #rosbuild_add_boost_directories()
 #rosbuild_link_boost(${PROJECT_NAME} thread)
 
+# add dynamic reconfigure api
+rosbuild_find_ros_package(dynamic_reconfigure)
+include(${dynamic_reconfigure_PACKAGE_PATH}/cmake/cfgbuild.cmake)
+gencfg()
+
 rosbuild_add_executable(wpa_supplicant_node src/nodes/wpa_supplicant_node.cpp)
 target_link_libraries(wpa_supplicant_node ${WPA_SUPPLICANT_LIBRARIES})
 rosbuild_add_link_flags(wpa_supplicant_node ${WPA_SUPPLICANT_LDFLAGS_OTHER})
