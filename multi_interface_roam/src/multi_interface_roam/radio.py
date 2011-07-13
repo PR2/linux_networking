@@ -147,6 +147,7 @@ class Radio:
 
     def _filter_raw_scan_results(self):
         self.scan_results = [ bss for bss in self.raw_scan_results if self.enabled_bss(bss) ]
+        self.scan_results = filter(lambda bss: bss.frequency in self.frequency_list.get(), self.scan_results)
         self.scan_results_event.trigger(self.scan_results)
     
     @mainThreadCallback

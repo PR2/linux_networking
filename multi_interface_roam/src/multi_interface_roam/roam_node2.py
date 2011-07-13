@@ -211,10 +211,6 @@ class RoamNode:
 
         self.interface_selector.set_mode(ssid, bssid, interface, use_tunnel, config['band'], config['scan_only'])
 
-        if config['country_code'] != self.interface_selector.get_country_code():
-            self.interface_selector.set_country_code(config['country_code'])
-        config['country_code'] = self.interface_selector.get_country_code()
-
         return config
 
 if __name__ == "__main__":

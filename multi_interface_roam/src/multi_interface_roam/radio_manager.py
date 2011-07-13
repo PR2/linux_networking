@@ -381,11 +381,11 @@ class RadioManager:
                 # Pick the best bss for this interface.
                 candidate_bsses = filter(self.check_bss_matches_forcing, 
                         self.scan_manager.bss_list.bsses.itervalues())
-                #print "Candidate bsses:", candidate_bsses
+                #print "Candidate bsses:", [mac_addr.pretty(bss.bssid) for bss in candidate_bsses]
                 if candidate_bsses:
                     expiry_time = now - self.bss_expiry_time
                     best_bss = max(candidate_bsses, key = lambda bss: self.desirability(bss, expiry_time, iface))
-                    if best_bss.by_iface[iface].stamp.to_sec() < expiry_time:
+                    if iface not in best_bss.by_iface or best_bss.by_iface[iface].stamp.to_sec() < expiry_time:
                         print "Best bss is expired.", mac_addr.pretty(best_bss.bssid)
                         best_bss = None
                 else:

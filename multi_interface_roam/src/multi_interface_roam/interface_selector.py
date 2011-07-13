@@ -104,15 +104,6 @@ class InterfaceSelector:
             else:
                 self.vpn_rule.set()
 
-    def set_country_code(self, country_code):
-        cmd = RunCommand('iw', 'reg', 'set', country_code)
-
-    def get_country_code(self):
-        cmd = RunCommand('iw', 'reg', 'get')
-        m = re.search("[Cc]ountry.*(\w\w):", cmd.stdout)
-        country_code = m.group(1) if m else ""
-        return country_code
-
     def _refresh_default_route(self, old_state, new_state):
         if new_state:
             system.system('ip', 'route', 'replace', 'table', str(RULEID.DEFAULT), 'default', "dev", self.tunnel_interface)
