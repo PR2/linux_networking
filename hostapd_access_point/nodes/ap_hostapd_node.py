@@ -96,7 +96,7 @@ ctrl_interface=/var/run/hostapd
 ignore_broadcast_ssid=0
 
 own_ip_addr=127.0.0.1
-country_code=US
+country_code=""" + self.config['country_code'] + """
 
 interface=""" + self.interface + """
 ssid=""" + self.config['ssid'] + """
