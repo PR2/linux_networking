@@ -8,10 +8,10 @@ rospack profile > /dev/null
 #APP_PATH=""
 
 # path to daemon
-DAEMON=`rospack find multi_interface_roam`/nodes/roam_node.py
+DAEMON=`which roslaunch`
 
-# startup args
-DAEMON_OPTS=`rospack find multi_interface_roam`/configs/pr2.yaml
+# startup args (ignored)
+DAEMON_OPTS=`rospack find multi_interface_roam`/configs/pr2-node2.launch
 
 # script name
 NAME=multi_interface_roam
@@ -30,10 +30,6 @@ else
 fi
 
 ############### END EDIT ME ##################
-
-if test -e /etc/default/multi_interface_roam; then
-  . /etc/default/multi_interface_roam
-fi
 
 test "$ENABLED" = 1 || exit 0
 

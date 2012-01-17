@@ -38,13 +38,19 @@ class InterfaceSelector:
         self.use_tunnel = True
         self.active_interfaces = []
 
-        print "Resolving basestation IP. (Blocking operation.)"
-        self.basestation_ip = socket.gethostbyname(config.get_parameter('base_station'))
+        self.basestation = config.get_parameter('base_station')
+#        print "Resolving basestation IP. (Blocking operation.)"
+#        self.basestation_ip = socket.gethostbyname(config.get_parameter('base_station'))
 
         # Add rules to guarantee that local routes go to the main table.
-        local_net_rule = ip_rule.IpRule(RULEID.LOCAL)
-        for subnet in config.get_parameter('local_networks'):
-            local_net_rule.add('to', subnet, 'lookup', 'main')
+#        self.local_net_rule = ip_rule.IpRule(RULEID.LOCAL)
+#        for subnet in config.get_parameter('local_networks'):
+#            self.local_net_rule.add('to', subnet, 'lookup', 'main')
+
+        self.local_net_rules = []
+        for (i, subnet) in enumerate(config.get_parameter('local_networks')):
+            self.local_net_rules.append(ip_rule.IpRule(RULEID.LOCAL+i))
+            self.local_net_rules[i].add('to', subnet, 'lookup', 'main')
 
         # Add a rule to send through the vpn.
         if self.tunnel_interface:
@@ -81,7 +87,7 @@ class InterfaceSelector:
                 self.radio_manager.add_iface(i)
         
         # Prepare the rules that select a particular interface.
-        self.tun_ip_rules = [ip_rule.IpRule(RULEID.TUNNEL+i) for i in range(len(self.interfaces))]
+        self.tun_ip_rules = [ip_rule.IpRule(RULEID.TUNNEL+i) for i in range(len(self.interfaces) + 1)]
         
         # Set up periodic updates, and run the first one.
         self.shutting_down = False
@@ -89,7 +95,12 @@ class InterfaceSelector:
         reactor.addSystemEventTrigger('before', 'shutdown', self._shutdown)
 
     def _shutdown(self):
-        self.shut_down = True
+        self.shutting_down = True
+        # remove all of our routing rules
+        for tir in self.tun_ip_rules:
+            tir.set()
+        for lnr in self.local_net_rules:
+            lnr.set()
 
     @mainThreadCallback
     def set_mode(self, ssid = "", bssid = "", sel_interface = "", use_tunnel = True, band = 3, scan_only = False):
@@ -129,14 +140,36 @@ class InterfaceSelector:
     @inlineCallbacks
     def set_tun_rules(self, selected_interfaces):
         # Set the interfaces we are given in order.
+
+        use_tunnel = self.use_tunnel
+        # If we can resolve the IP of the base station, use the tunnel
+        # otherwise, things are probably bad. don't use the tunnel 
+        # - if the tunnel (or DNS over the tunnel) is broken, this will
+        #   diable the tunnel
+        # - if we didn't have DNS and it starts working, this will enable
+        #   the tunnel
+        # - the basestation is a raw IP, this should always succeed and enable
+        #   the tunnel
+        if use_tunnel:
+            try:
+                self.basestation_ip = socket.gethostbyname(self.basestation)
+            except socket.error:
+                use_tunnel = False
+
         for i, iface in enumerate(selected_interfaces):
-            if self.use_tunnel:
+            if use_tunnel:
                 self.tun_ip_rules[i].set('to', self.basestation_ip, 'lookup', iface.tableid)
             else:
                 self.tun_ip_rules[i].set('lookup', iface.tableid)
 
+        last_rule = len(selected_interfaces)
+        # set up blackhole rule if we're using a tunnel
+        if use_tunnel:
+            self.tun_ip_rules[last_rule].set('to', self.basestation_ip, 'blackhole')
+            last_rule += 1
+            
         # Clear the remaining rules.
-        for tir in self.tun_ip_rules[len(selected_interfaces):]:
+        for tir in self.tun_ip_rules[last_rule:]:
             yield tir.set()
     
     TERRIBLE_INTERFACE = -1e1000

@@ -21,6 +21,7 @@ class MonitorSource :
         self.interval = 1.0 / rate
         self.send_thread = threading.Thread(target = self.send_thread_entry, name = "udpmoncli: send_thread")
         self.recv_thread = threading.Thread(target = self.recv_thread_entry, name = "udpmoncli: recv_thread")
+        self.dns_thread = threading.Thread(target = self.dns_thread_entry, name = "udpmoncli: dns_thread")
         self.pkt_length = pkt_length
         self.exiting = False
         self.sourceaddr = self.resolve_addr(sourceaddr)
@@ -41,7 +42,7 @@ class MonitorSource :
         self.sending_too_fast = False
 
         try:
-            self.destaddr = self.resolve_addr(self.destaddr)
+            self.destaddr_ip = self.resolve_addr(self.destaddr)
         except:
             pass # We'll try again later if it fails.
         self.lost = 0
@@ -74,6 +75,7 @@ class MonitorSource :
             self.start_monitor()
 
         self.window_start = time.time()
+        self.dns_thread.start()
         self.recv_thread.start()
         self.send_thread.start()
 
@@ -117,6 +119,7 @@ class MonitorSource :
                 print "Could not set TOS:", str(e)
 
     def start_monitor(self, sourceaddr = None):
+        print "Starting UDP monitor"
         if self.paused:
             self.init_socket(sourceaddr)
             with self.cv:
@@ -136,6 +139,18 @@ class MonitorSource :
         self.exiting = True
         with self.cv:
             self.cv.notify_all()
+
+    # re-resolve the IP of the base station every 60 seconds.
+    def dns_thread_entry(self):
+        next_time = time.time()
+        while not self.exiting:
+            try:
+                self.destaddr_ip = self.resolve_addr(self.destaddr)
+                sys.stderr.write("Base station address is %s:%d\n"%self.destaddr_ip)
+            except:
+                sys.stderr.write("Failed to resolve base station address\n")
+                continue 
+            time.sleep(15)
 
     def send_thread_entry(self):
         next_time = time.time()
@@ -164,14 +179,10 @@ class MonitorSource :
                     hdr = struct.pack(self.pktstruct, self.magic, send_time, 0, seqnum)
                 with self.mutex:
                     self.outstanding[seqnum] = send_time
-                try:
-                    self.destaddr = self.resolve_addr(self.destaddr)
-                except:
-                    continue # This will count as a dropped packet. 
-                self.socket.sendto(hdr.ljust(self.pkt_length), self.destaddr)
+                self.socket.sendto(hdr.ljust(self.pkt_length), self.destaddr_ip)
             except Exception, e:
                 self.exceptions.add(str(e))
-                #print "Got exception in send thread:", e
+                print "Got exception in send thread:", e
                 #traceback.print_exc(10)
                 #print self.destaddr
         #print "Udp monitor send_thread finished shut down"

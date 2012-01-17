@@ -51,6 +51,7 @@ class Node:
         sigblock.restore_mask()
         rospy.core.add_shutdown_hook(self._shutdown_by_ros)
         reactor.addSystemEventTrigger('after', 'shutdown', self._shutdown_by_reactor)
+        rospy.loginfo("Node __init__ done");
 
     def _shutdown_by_reactor(self):
         rospy.signal_shutdown("Reactor shutting down.")
@@ -215,6 +216,7 @@ class RoamNode:
 
 if __name__ == "__main__":
     def start():
+        print "roam_node2 starting..."
         try:
             RoamNode()
         except:
