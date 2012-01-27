@@ -8,7 +8,7 @@
   <license>GPL,BSD,LGPL,GPL for sigblock</license>  
   <review status="unreviewed" notes=""/>
   <url>http://ros.org/wiki/linux_networking</url>
-  <depend stack="common" /> <!-- actionlib -->
+  <depend stack="actionlib" /> <!-- actionlib -->
   <depend stack="common_msgs" /> <!-- actionlib_msgs, diagnostic_msgs -->
   <depend stack="driver_common" /> <!-- dynamic_reconfigure -->
   <depend stack="executive_smach" /> <!-- smach_ros -->
