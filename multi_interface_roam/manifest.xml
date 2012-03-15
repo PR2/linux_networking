@@ -26,7 +26,7 @@
   <rosdep name="python-libpcap"/>"
   <rosdep name="python-twisted-core"/>
   <rosdep name="udhcpc"/>
-  <rosdep name="scapy"/>
+  <rosdep name="python-scapy"/>
   <rosdep name="beep"/>
 </package>
 
