@@ -1,3 +1,4 @@
+Old TODOs:
 - iwevent monitoring, and use of iwconfig to determine if an interface is
   wireless, and what bssid it is connected to. Publish events based on
   these.
@@ -9,3 +10,18 @@
 - module to set IP address after dhcp
 
 - at shutdown, make sure the IP address gets deconfigured.
+
+
+Release checklist:
+- condense configuration for PR2
+  - read interface config from /etc/interfaces ?
+  - read VPN endpoint from openvpn config?
+- streamline install process
+- status interface
+  - keep robot_status page in mind
+  - keep in mind adding state wired/wireless to login banner
+- support interfaces with a static IP configuration
+- bring back beep on cable plug/unplug
+
+Other considerations:
+- consider equipping a PR2 with a 3G modem
