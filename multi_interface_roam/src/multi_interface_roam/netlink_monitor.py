@@ -122,7 +122,7 @@ class NetlinkMonitor(command_with_output.CommandWithOutput):
                             try:
                                 link_state = pythonwifi.iwlibs.Wireless(self.cur_iface).getAPaddr()
                             except IOError, e:
-                                if e.errno == 95:
+                                if e.errno == 95 or e.errno == 22:
                                     link_state = 'Wired'
                                 else:
                                     raise
