@@ -23,15 +23,20 @@ class LoggerStream:
         self.lock = threading.Lock()
         self.buffer = ""
         self.func = func
+        self.progress = None
 
     def write(self, str):
+        if self.progress and str.partition('\n')[0].endswith(self.progress):
+            return
         with self.lock:
             self.buffer += str
             while True:
                 pos = self.buffer.find('\n')
                 if pos == -1:
                     break
-                self.func(self.buffer[0:pos])
+                self.progress = self.buffer[0:pos]
+                self.func(self.progress)
+                self.progress = None
                 self.buffer = self.buffer[pos+1:]
 
     def flush(self):

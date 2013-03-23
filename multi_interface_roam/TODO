@@ -22,6 +22,7 @@ Release checklist:
   - keep in mind adding state wired/wireless to login banner
 - support interfaces with a static IP configuration
 - bring back beep on cable plug/unplug
+- manage /etc/resolv.conf
 
 Other considerations:
 - consider equipping a PR2 with a 3G modem
