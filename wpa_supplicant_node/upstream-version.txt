@@ -1,0 +1,1 @@
+Currently based of wpa_supplicant-0.7.2.

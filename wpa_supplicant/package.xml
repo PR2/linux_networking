@@ -1,0 +1,24 @@
+<package>
+  <name>wpa_supplicant</name>
+  <version>1.0.0</version>
+  <description>A version of wpa_supplicant that has been modified to work with
+     multi_interface_roam.</description>
+  <maintainer email="dash@clearpathrobotics.com">Dash</maintainer>
+
+  <license>GPL</license>
+
+  <url type="website">http://ros.org/wiki/wpa_supplicant</url>
+  <!-- <url type="bugtracker"></url> -->
+
+  <author>Package maintained by Blaise Gassend</author>
+
+  <!-- Dependencies which this package needs to build itself. -->
+  <buildtool_depend>catkin</buildtool_depend>
+
+  <!-- Dependencies needed to compile this package. -->
+
+  <!-- Dependencies needed after this package is compiled. -->
+
+  <!-- Dependencies needed only for running tests. -->
+
+</package>

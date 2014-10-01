@@ -1,0 +1,4 @@
+* Race condition on disassoc. Need to wait for disassoc message to arrive
+before disassociating.
+
+* Need to shutdown when node with same name starts.
