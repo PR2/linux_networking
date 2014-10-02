@@ -13,15 +13,14 @@ set(ENV{PKG_CONFIG_PATH} "${PROJECT_SOURCE_DIR}/wpa_supplicant/wpa_supplicant:$E
 
 link_directories(${WPA_SUPPLICANT_LIBRARY_DIRS})
 include_directories(wpa_supplicant/wpa_supplicant ${catkin_INCLUDE_DIRS}wpa_supplicant/src wpa_supplicant/src/utils/ wpa_supplicant/wpa_supplicant/ utils/ wpa_supplicant/wpa_supplicant/src/utils/ ${WPA_SUPPLICANT_INCLUDE_DIRS})
+
+include_directories(wpa_supplicant/src/utils wpa_supplicant/src)
+
 #add_link_flags(wpa_supplicant_node ${WPA_SUPPLICANT_LDFLAGS_OTHER})
 #add_compile_flags(wpa_supplicant_node ${WPA_SUPPLICANT_CFLAGS_OTHER})
 
 generate_dynamic_reconfigure_options(cfg/WpaSupplicantNode.cfg)
 
-add_executable(wpa_supplicant_node src/nodes/wpa_supplicant_node.cpp)
-target_link_libraries(wpa_supplicant_node ${WPA_SUPPLICANT_LIBRARIES} ${catkin_LIBRARIES})
-
-add_dependencies(wpa_supplicant_node wpa_supplicant_node_gencpp ${catkin_EXPORTED_TARGETS} ${PROJECT_NAME}_node_gencfg ${PROJECT_NAME}_INCLUDE_DIRS)
 
 add_message_files(
     FILES 
@@ -59,4 +58,9 @@ catkin_package(
     LIBRARIES # TODO
 )
 
+add_executable(wpa_supplicant_node src/nodes/wpa_supplicant_node.cpp)
+target_link_libraries(wpa_supplicant_node ${WPA_SUPPLICANT_LIBRARIES} ${catkin_LIBRARIES} ${WPA_SUPPLICANT_LIBRARIES})
+add_dependencies(wpa_supplicant_node wpa_supplicant_node_gencpp ${catkin_EXPORTED_TARGETS} ${PROJECT_NAME}_node_gencfg ${PROJECT_NAME}_INCLUDE_DIRS)
+
 install(DIRECTORY wpa_supplicant DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION})
+
