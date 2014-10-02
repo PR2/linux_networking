@@ -1,0 +1,7 @@
+\subsubsection usage Usage
+\verbatim
+<node name="wpa_supplicant_node" pkg="wpa_supplicant_node" type="wpa_supplicant_node">
+  <param name="country_code" type="str" value="US" />
+</node>
+\endverbatim
+

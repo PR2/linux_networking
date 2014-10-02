@@ -1,0 +1,6 @@
+\subsubsection parameters ROS parameters
+
+Reads and maintains the following parameters on the ROS server
+
+- \b "~country_code" : \b [str] Wireless regulatory domain ISO/IEC 3166 alpha2 country code. min: , default: US, max: 
+
