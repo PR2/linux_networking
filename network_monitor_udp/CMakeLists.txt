@@ -23,6 +23,9 @@ find_package(catkin REQUIRED COMPONENTS roscpp rospy diagnostic_msgs actionlib_m
 
 add_executable(udpmonserv src/utilities/udpmonserv.c src/utilities/helpers.c)
 add_executable(udpmonsink src/utilities/udpmonsink.cpp src/utilities/helpers.c)
+target_link_libraries(udpmonserv ${CATKIN_LIBRARIES})
+target_link_libraries(udpmonsink ${CATKIN_LIBRARIES})
+
 #target_link_libraries(example ${PROJECT_NAME})
 ## Generate added messages and services with any dependencies listed here
 add_message_files(

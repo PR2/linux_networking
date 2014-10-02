@@ -22,7 +22,7 @@ find_package(catkin REQUIRED COMPONENTS roscpp actionlib actionlib_msgs dynamic_
 #set(ROS_BUILD_TYPE RelWithDebInfo)
 
 add_executable(wpa_supplicant_node src/nodes/wpa_supplicant_node.cpp)
-target_link_libraries(wpa_supplicant_node ${WPA_SUPPLICANT_LIBRARIES})
+target_link_libraries(wpa_supplicant_node ${WPA_SUPPLICANT_LIBRARIES} ${CATKIN_LIBRARIES})
 
 # CATKIN_MIGRATION
 # use link_directories() include_directories(), add_definitions(), target_link_libraries() or set_target_properties
