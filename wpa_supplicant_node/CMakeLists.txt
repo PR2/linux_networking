@@ -7,11 +7,20 @@ project(wpa_supplicant_node)
 find_package(catkin REQUIRED COMPONENTS roscpp actionlib actionlib_msgs dynamic_reconfigure)
 
 
-include_directories(wpa_supplicant/wpa_supplicant ${catkin_INCLUDE_DIRS})
+
+set(ENV{PKG_CONFIG_PATH} "${PROJECT_SOURCE_DIR}/wpa_supplicant/wpa_supplicant:$ENV{PKG_CONFIG_PATH}")
+#pkg_check_modules(WPA_SUPPLICANT REQUIRED libwpa_supplicant)
+
+link_directories(${WPA_SUPPLICANT_LIBRARY_DIRS})
+include_directories(wpa_supplicant/wpa_supplicant ${catkin_INCLUDE_DIRS}wpa_supplicant/src wpa_supplicant/src/utils/ wpa_supplicant/wpa_supplicant/ utils/ wpa_supplicant/wpa_supplicant/src/utils/ ${WPA_SUPPLICANT_INCLUDE_DIRS})
+#add_link_flags(wpa_supplicant_node ${WPA_SUPPLICANT_LDFLAGS_OTHER})
+#add_compile_flags(wpa_supplicant_node ${WPA_SUPPLICANT_CFLAGS_OTHER})
+
 generate_dynamic_reconfigure_options(cfg/WpaSupplicantNode.cfg)
 
 add_executable(wpa_supplicant_node src/nodes/wpa_supplicant_node.cpp)
 target_link_libraries(wpa_supplicant_node ${WPA_SUPPLICANT_LIBRARIES} ${catkin_LIBRARIES})
+
 add_dependencies(wpa_supplicant_node wpa_supplicant_node_gencpp ${catkin_EXPORTED_TARGETS} ${PROJECT_NAME}_node_gencfg ${PROJECT_NAME}_INCLUDE_DIRS)
 
 add_message_files(
@@ -46,6 +55,8 @@ generate_messages(
 catkin_package(
     DEPENDS roscpp actionlib actionlib_msgs dynamic_reconfigure 
     CATKIN_DEPENDS # TODO
-    INCLUDE_DIRS wpa_supplicant# TODO include
+    INCLUDE_DIRS wpa_supplicant # TODO include
     LIBRARIES # TODO
 )
+
+install(DIRECTORY wpa_supplicant DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION})
