@@ -62,5 +62,12 @@ add_executable(wpa_supplicant_node src/nodes/wpa_supplicant_node.cpp)
 target_link_libraries(wpa_supplicant_node ${WPA_SUPPLICANT_LIBRARIES} ${catkin_LIBRARIES} ${WPA_SUPPLICANT_LIBRARIES})
 add_dependencies(wpa_supplicant_node wpa_supplicant_node_gencpp ${catkin_EXPORTED_TARGETS} ${PROJECT_NAME}_node_gencfg ${PROJECT_NAME}_INCLUDE_DIRS)
 
+SET_TARGET_PROPERTIES(wpa_supplicant_node 
+PROPERTIES 
+    LINK_FLAGS "${WPA_SUPPLICANT_LDFLAGS_OTHER}"
+    COMPILE_FLAGS "${WPA_SUPPLICANT_CFLAGS_OTHER}"
+)
+
+
 install(DIRECTORY wpa_supplicant DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION})
 
