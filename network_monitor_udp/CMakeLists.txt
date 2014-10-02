@@ -23,8 +23,11 @@ find_package(catkin REQUIRED COMPONENTS roscpp rospy diagnostic_msgs actionlib_m
 
 add_executable(udpmonserv src/utilities/udpmonserv.c src/utilities/helpers.c)
 add_executable(udpmonsink src/utilities/udpmonsink.cpp src/utilities/helpers.c)
-target_link_libraries(udpmonserv ${CATKIN_LIBRARIES})
-target_link_libraries(udpmonsink ${CATKIN_LIBRARIES})
+target_link_libraries(udpmonserv ${catkin_LIBRARIES})
+target_link_libraries(udpmonsink ${catkin_LIBRARIES})
+add_dependencies(udpmonsink network_monitor_gencpp ${catkin_EXPORTED_TARGETS})
+add_dependencies(udpmonserv network_monitor_gencpp ${catkin_EXPORTED_TARGETS})
+
 
 #target_link_libraries(example ${PROJECT_NAME})
 ## Generate added messages and services with any dependencies listed here
@@ -39,9 +42,9 @@ add_action_files(
     Linktest.action
 )
 
-#generate_messages(
-#    #TODO DEPENDENCIES rospy diagnostic_msgs actionlib_msgs actionlib
-#)
+generate_messages(
+    DEPENDENCIES diagnostic_msgs actionlib_msgs actionlib
+)
 
 # catkin_package parameters: http://ros.org/doc/groovy/api/catkin/html/dev_guide/generated_cmake_api.html#catkin-package
 # TODO: fill in what other packages will need to use this package
