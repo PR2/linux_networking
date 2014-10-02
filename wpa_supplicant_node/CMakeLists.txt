@@ -12,6 +12,7 @@ set(ENV{PKG_CONFIG_PATH} "${PROJECT_SOURCE_DIR}/wpa_supplicant/wpa_supplicant:$E
 #pkg_check_modules(WPA_SUPPLICANT REQUIRED libwpa_supplicant)
 
 link_directories(${WPA_SUPPLICANT_LIBRARY_DIRS})
+include_directories(${WPA_SUPPLICANT_INCLUDE_DIRS})
 include_directories(wpa_supplicant/wpa_supplicant ${catkin_INCLUDE_DIRS}wpa_supplicant/src wpa_supplicant/src/utils/ wpa_supplicant/wpa_supplicant/ utils/ wpa_supplicant/wpa_supplicant/src/utils/ ${WPA_SUPPLICANT_INCLUDE_DIRS})
 
 include_directories(wpa_supplicant/src/utils wpa_supplicant/src)
