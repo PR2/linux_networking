@@ -2,5 +2,8 @@
 Changelog for package linksys_access_point
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+Forthcoming
+-----------
+
 1.0.2 (2014-10-03)
 ------------------

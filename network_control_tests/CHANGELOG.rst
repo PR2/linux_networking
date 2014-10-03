@@ -2,5 +2,8 @@
 Changelog for package network_control_tests
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+Forthcoming
+-----------
+
 1.0.2 (2014-10-03)
 ------------------
