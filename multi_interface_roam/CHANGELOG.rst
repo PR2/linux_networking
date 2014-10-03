@@ -2,6 +2,9 @@
 Changelog for package multi_interface_roam
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+Forthcoming
+-----------
+
 1.0.3 (2014-10-03)
 ------------------
 
