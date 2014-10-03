@@ -22,7 +22,6 @@
   <build_depend>std_msgs</build_depend>
   <build_depend>diagnostic_msgs</build_depend>
   <build_depend>pr2_msgs</build_depend>
-  <build_depend>wpa_supplicant_node</build_depend>
   <build_depend>asmach</build_depend>
   <build_depend>dynamic_reconfigure</build_depend>
   <build_depend>ieee80211_channels</build_depend>
@@ -33,7 +32,6 @@
   <run_depend>std_msgs</run_depend>
   <run_depend>diagnostic_msgs</run_depend>
   <run_depend>pr2_msgs</run_depend>
-  <run_depend>wpa_supplicant_node</run_depend>
   <run_depend>asmach</run_depend>
   <run_depend>dynamic_reconfigure</run_depend>
   <run_depend>ieee80211_channels</run_depend>

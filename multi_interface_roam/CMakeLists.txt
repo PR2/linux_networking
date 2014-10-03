@@ -4,7 +4,7 @@ cmake_minimum_required(VERSION 2.8.3)
 project(multi_interface_roam)
 # Load catkin and all dependencies required for this package
 # TODO: remove all from COMPONENTS that are not catkin packages.
-find_package(catkin REQUIRED COMPONENTS rospy network_monitor_udp std_msgs diagnostic_msgs pr2_msgs wpa_supplicant_node  dynamic_reconfigure ieee80211_channels)
+find_package(catkin REQUIRED COMPONENTS rospy network_monitor_udp std_msgs diagnostic_msgs pr2_msgs dynamic_reconfigure ieee80211_channels)
 
 # include_directories(include ${Boost_INCLUDE_DIR} ${catkin_INCLUDE_DIRS})
 # CATKIN_MIGRATION: removed during catkin migration
