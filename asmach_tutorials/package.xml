@@ -1,6 +1,6 @@
 <package>
   <name>asmach_tutorials</name>
-  <version>1.0.1</version>
+  <version>1.0.2</version>
   <description>This package containes numerous examples of how to use SMACH. See the examples directory.</description>
   <maintainer email="dash@clearpathrobotics.com">Dash</maintainer>
 
