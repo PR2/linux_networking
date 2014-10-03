@@ -1,7 +1,0 @@
-string ssid
-uint8[6] bssid
-#Bss bss
----
----
-bool associated
-Bss bss

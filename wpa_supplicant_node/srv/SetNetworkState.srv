@@ -1,4 +1,0 @@
-int32 network_id
-bool enable # True to enable, false to disable
----
-bool success
