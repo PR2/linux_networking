@@ -2,6 +2,9 @@
 Changelog for package access_point_control
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+Forthcoming
+-----------
+
 1.0.4 (2014-10-03)
 ------------------
 

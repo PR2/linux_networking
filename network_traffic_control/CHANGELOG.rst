@@ -2,6 +2,9 @@
 Changelog for package network_traffic_control
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+Forthcoming
+-----------
+
 1.0.4 (2014-10-03)
 ------------------
 
