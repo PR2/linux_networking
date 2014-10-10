@@ -60,12 +60,9 @@ catkin_package(
 )
 
 
-install(FILES  DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION})
-install(PROGRAMS /src/ieee80211_channels/channels.py /src/ieee80211_channels/__init__.py /scripts/generate_wiki_table.py  USE_SOURCE_PERMISSIONS 
+install(PROGRAMS /scripts/generate_wiki_table.py  USE_SOURCE_PERMISSIONS 
  DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
 
-install(DIRECTORY src scripts ieee80211_channels prop-base props tmp text-base prop-base props text-base prop-base props tmp text-base prop-base props text-base prop-base props tmp text-base prop-base props text-base prop-base props tmp text-base prop-base props text-base  
- DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION})
 
 
 
