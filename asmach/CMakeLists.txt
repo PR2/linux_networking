@@ -14,8 +14,6 @@ catkin_package(
 )
 
 
-install(PROGRAMS /src/asmach/concurrence.py /src/asmach/state_machine.py /src/asmach/tb_edit.py /src/asmach/log.py /src/asmach/async.py /src/asmach/util.py /src/asmach/iterator.py /src/asmach/state.py /src/asmach/user_data.py /src/asmach/sequence.py /src/asmach/exceptions.py /src/asmach/container.py /src/asmach/__init__.py  USE_SOURCE_PERMISSIONS 
- DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
 
 install(DIRECTORY src asmach  
  DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION})
