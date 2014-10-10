@@ -2,8 +2,8 @@
 Changelog for package asmach
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Forthcoming
------------
+1.0.7 (2014-10-10)
+------------------
 * Removed scripts
 * Contributors: TheDash
 
