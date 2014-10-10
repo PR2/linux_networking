@@ -2,6 +2,9 @@
 Changelog for package linux_networking
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+Forthcoming
+-----------
+
 1.0.6 (2014-10-10)
 ------------------
 
