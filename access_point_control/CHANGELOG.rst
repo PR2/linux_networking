@@ -2,6 +2,11 @@
 Changelog for package access_point_control
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+Forthcoming
+-----------
+* fixed bug
+* Contributors: TheDash
+
 1.0.5 (2014-10-06)
 ------------------
 

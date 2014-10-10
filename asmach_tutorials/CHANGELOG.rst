@@ -2,6 +2,9 @@
 Changelog for package asmach_tutorials
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+Forthcoming
+-----------
+
 1.0.5 (2014-10-06)
 ------------------
 
