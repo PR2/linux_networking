@@ -27,10 +27,13 @@ bool interfaceIsRunning( std::string interface_name )
   if( ioctl( socket_fd, SIOCGIFFLAGS, &ifr ) < 0 )
   {
     static std::string last_warning;
-    std::string warning = "Query of interface '" + interface_name + "' failed: '" + strerror( errno ) + "'  Presuming down.";
+    std::string warn = "Query of interface '" + interface_name + "' failed: '" + strerror( errno ) + "'  Presuming down.";
+
+    const char * warning = warn.c_str();
     if( warning != last_warning )
     {
-      ROS_WARN( warning.c_str() );
+
+      ROS_WARN("%s", warning);
     }
     last_warning = warning;
     return false;
