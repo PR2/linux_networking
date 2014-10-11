@@ -2,8 +2,8 @@
 Changelog for package asmach
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Forthcoming
------------
+1.0.8 (2014-10-10)
+------------------
 * Fixed asmach
 * Removed rosbuild files
 * Contributors: TheDash
