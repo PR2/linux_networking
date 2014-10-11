@@ -15,8 +15,6 @@ catkin_package(
 
 
 
-install(DIRECTORY src asmach  
- DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION})
 
 
 
