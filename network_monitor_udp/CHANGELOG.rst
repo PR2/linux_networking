@@ -2,6 +2,11 @@
 Changelog for package network_monitor_udp
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+Forthcoming
+-----------
+* Removed rosbuild files
+* Contributors: TheDash
+
 1.0.7 (2014-10-10)
 ------------------
 

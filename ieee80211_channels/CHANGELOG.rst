@@ -2,6 +2,12 @@
 Changelog for package ieee80211_channels
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+Forthcoming
+-----------
+* Fixed ieee package
+* Removed rosbuild files
+* Contributors: TheDash
+
 1.0.7 (2014-10-10)
 ------------------
 
