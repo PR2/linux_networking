@@ -59,7 +59,7 @@ catkin_package(
 
 
 
-install(DIRECTORY src cfg access_point_control  
+install(DIRECTORY src cfg  
  DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION})
 
 
