@@ -60,7 +60,7 @@ catkin_package(
 )
 
 
-install(PROGRAMS /scripts/generate_wiki_table.py  USE_SOURCE_PERMISSIONS 
+install(PROGRAMS scripts/generate_wiki_table.py
  DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
 
 
