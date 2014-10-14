@@ -2,6 +2,9 @@
 Changelog for package asmach_tutorials
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+Forthcoming
+-----------
+
 1.0.8 (2014-10-10)
 ------------------
 * Removed rosbuild files

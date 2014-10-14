@@ -2,6 +2,11 @@
 Changelog for package access_point_control
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+Forthcoming
+-----------
+* Access_point_control catkin_make install fix
+* Contributors: TheDash
+
 1.0.8 (2014-10-10)
 ------------------
 * Removed rosbuild files
