@@ -50,7 +50,7 @@ catkin_package(
 
 
 install(FILES hostapd.launch  DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION})
-install(PROGRAMS nodes/ap_hostapd_node.py /scripts/hwsim_nat_setup.sh /scripts/find_hwsim_iface.py
+install(PROGRAMS nodes/ap_hostapd_node.py scripts/hwsim_nat_setup.sh scripts/find_hwsim_iface.py
  DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
 
 install(DIRECTORY nodes scripts  
