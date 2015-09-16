@@ -2,7 +2,7 @@
   <name>network_traffic_control</name>
   <version>1.0.10</version>
   <description>A ROS node that allows control of network emulation parameters such as bandwidth, loss and latency for a Linux network interface.</description>
-  <maintainer email="dash@clearpathrobotics.com">Dash</maintainer>
+  <maintainer email="dash@clearpathrobotics.com">Devon Ash</maintainer>
 
   <license>BSD</license>
 

@@ -5,7 +5,7 @@
      whether it is both UP and RUNNING (indicating that a cable is
      plugged into it and communication is happening, for instance) or
      not.</description>
-  <maintainer email="dash@clearpathrobotics.com">Dash</maintainer>
+  <maintainer email="dash@clearpathrobotics.com">Devon Ash</maintainer>
 
   <license>BSD</license>
 

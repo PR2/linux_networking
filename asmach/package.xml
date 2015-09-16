@@ -7,7 +7,7 @@
     hierarchical state machines.  SMACH is a new library that takes
     advantage of very old concepts in order to quickly create robust
     robot behavior with maintainable and modular code.</description>
-  <maintainer email="dash@clearpathrobotics.com">Dash</maintainer>
+  <maintainer email="dash@clearpathrobotics.com">Devon Ash</maintainer>
 
   <license>BSD</license>
 

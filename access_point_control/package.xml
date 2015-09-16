@@ -6,7 +6,7 @@
     implement the API for various access-point models: 
     for example: hostapd_access_point for hostapd-based control or
     linksys_access_point for Linksys router web interface.</description>
-  <maintainer email="dash@clearpathrobotics.com">Dash</maintainer>
+  <maintainer email="dash@clearpathrobotics.com">Devon Ash</maintainer>
 
   <license>BSD</license>
 

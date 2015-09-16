@@ -2,7 +2,7 @@
   <name>asmach_tutorials</name>
   <version>1.0.10</version>
   <description>This package containes numerous examples of how to use SMACH. See the examples directory.</description>
-  <maintainer email="dash@clearpathrobotics.com">Dash</maintainer>
+  <maintainer email="dash@clearpathrobotics.com">Devon Ash</maintainer>
 
   <license>BSD</license>
 
