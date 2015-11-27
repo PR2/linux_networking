@@ -1,6 +1,6 @@
 #! /usr/bin/env python
 
-import roslib; roslib.load_manifest('multi_interface_roam')
+#import roslib; roslib.load_manifest('multi_interface_roam')
 import rospy
 import config
 import dynamic_reconfigure.server
