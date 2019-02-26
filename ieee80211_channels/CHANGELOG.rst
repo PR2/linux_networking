@@ -2,6 +2,9 @@
 Changelog for package ieee80211_channels
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+Forthcoming
+-----------
+
 1.0.9 (2014-10-14)
 ------------------
 * Fixed ieeee build fail bug, removed USE_SOURCE_PERM

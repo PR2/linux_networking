@@ -2,6 +2,11 @@
 Changelog for package network_detector
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+Forthcoming
+-----------
+* changes to cmakelists files to make packages compile in kinetic
+* Contributors: David Feil-Seifer
+
 1.0.9 (2014-10-14)
 ------------------
 

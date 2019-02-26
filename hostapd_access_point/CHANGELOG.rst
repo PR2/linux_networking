@@ -2,6 +2,9 @@
 Changelog for package hostapd_access_point
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+Forthcoming
+-----------
+
 1.0.9 (2014-10-14)
 ------------------
 * Fixed hostapd

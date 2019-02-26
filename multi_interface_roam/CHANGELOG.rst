@@ -2,6 +2,11 @@
 Changelog for package multi_interface_roam
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+Forthcoming
+-----------
+* removed roslib declaration
+* Contributors: TheDash
+
 1.0.9 (2014-10-14)
 ------------------
 
