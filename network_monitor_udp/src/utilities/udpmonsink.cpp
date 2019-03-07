@@ -14,8 +14,8 @@
 #include "network_monitor_udp/UdpSink.h"
 
 struct udpmon_pkt buff;
-char magic_udp[] = UDPMON_MAGIC;
-char magic_ros[] = UDPMON_MAGIC_ROS;
+unsigned char magic_udp[] = UDPMON_MAGIC;
+unsigned char magic_ros[] = UDPMON_MAGIC_ROS;
 
 #define FEEDBACK_QUEUE_SIZE 10000
 
