@@ -2,8 +2,8 @@
 Changelog for package network_monitor_udp
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Forthcoming
------------
+1.0.13 (2019-03-06)
+-------------------
 * fixed unsigned char errors for melodic compile
 * Contributors: David Feil-Seifer
 
