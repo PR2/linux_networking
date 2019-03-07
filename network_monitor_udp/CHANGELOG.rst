@@ -2,6 +2,11 @@
 Changelog for package network_monitor_udp
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+Forthcoming
+-----------
+* fixed unsigned char errors for melodic compile
+* Contributors: David Feil-Seifer
+
 1.0.12 (2019-02-26)
 -------------------
 * changes to cmakelists files to make packages compile in kinetic
