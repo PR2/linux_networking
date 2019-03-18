@@ -2,8 +2,8 @@
 Changelog for package network_monitor_udp
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Forthcoming
------------
+1.0.13 (2019-03-18)
+-------------------
 * updated cmake for message build dependency issue in kinetic
 * Contributors: David Feil-Seifer
 
