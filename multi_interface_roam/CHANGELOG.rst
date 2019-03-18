@@ -2,6 +2,9 @@
 Changelog for package multi_interface_roam
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+Forthcoming
+-----------
+
 1.0.12 (2019-02-26)
 -------------------
 * removed roslib declaration
