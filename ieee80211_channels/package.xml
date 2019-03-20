@@ -1,6 +1,6 @@
 <package>
   <name>ieee80211_channels</name>
-  <version>1.0.14</version>
+  <version>1.0.15</version>
   <description>This package provides mapping from frequencies to
     IEEE802.11 channels and vice-versa.</description>
   <maintainer email="dash@clearpathrobotics.com">Devon Ash</maintainer>

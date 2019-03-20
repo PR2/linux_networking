@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <package>
   <name>linux_networking</name>
-  <version>1.0.14</version>
+  <version>1.0.15</version>
   <description>The linux_networking package</description>
 
   <!-- One maintainer tag required, multiple allowed, one person per tag --> 
