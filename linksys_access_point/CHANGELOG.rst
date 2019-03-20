@@ -5,6 +5,9 @@ Changelog for package linksys_access_point
 1.0.13 (2019-03-18)
 -------------------
 
+Forthcoming
+-----------
+
 1.0.12 (2019-02-26)
 -------------------
 
