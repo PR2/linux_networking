@@ -2,7 +2,7 @@
 #define __UDPMON_H__
 
 // First magic character is 0xEF, a convenient opcode for wg-openvpn.
-#define UDPMON_MAGIC { 0xEF, 0x41, 0xc6, 0x35 }
+#define UDPMON_MAGIC { (unsigned char) 0xEF, (unsigned char) 0x41, (unsigned char) 0xc6, (unsigned char) 0x35 }
 #define UDPMON_MAGIC_ROS { 0xEF, 0x41, 0xc6, 0x34 }
 
 struct __attribute__((__packed__)) udpmon_pkt

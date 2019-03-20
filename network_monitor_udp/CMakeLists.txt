@@ -24,12 +24,6 @@ find_package(catkin REQUIRED COMPONENTS roscpp rospy diagnostic_msgs actionlib_m
 include_directories(include ${catkin_INCLUDE_DIRS})
 
 
-add_executable(udpmonserv src/utilities/udpmonserv.c src/utilities/helpers.c)
-add_executable(udpmonsink src/utilities/udpmonsink.cpp src/utilities/helpers.c)
-target_link_libraries(udpmonserv ${catkin_LIBRARIES})
-target_link_libraries(udpmonsink ${catkin_LIBRARIES})
-add_dependencies(udpmonsink network_monitor_gencpp ${catkin_EXPORTED_TARGETS})
-add_dependencies(udpmonserv network_monitor_gencpp ${catkin_EXPORTED_TARGETS})
 
 
 #target_link_libraries(example ${PROJECT_NAME})
@@ -53,7 +47,16 @@ generate_messages(
 # TODO: fill in what other packages will need to use this package
 catkin_package(
     DEPENDS rospy diagnostic_msgs actionlib_msgs actionlib message_runtime 
-    CATKIN_DEPENDS # TODO
-    INCLUDE_DIRS # TODO include
-    LIBRARIES # TODO
+    #CATKIN_DEPENDS # TODO
+    #INCLUDE_DIRS # TODO include
+    #LIBRARIES # TODO
 )
+
+include_directories( ${catkin_INCLUDE_DIRS})
+
+add_executable(udpmonserv src/utilities/udpmonserv.c src/utilities/helpers.c)
+add_executable(udpmonsink src/utilities/udpmonsink.cpp src/utilities/helpers.c)
+target_link_libraries(udpmonserv ${catkin_LIBRARIES})
+target_link_libraries(udpmonsink ${catkin_LIBRARIES})
+add_dependencies(udpmonsink ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+add_dependencies(udpmonserv ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
