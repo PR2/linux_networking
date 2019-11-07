@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 
 import roslib; roslib.load_manifest('network_monitor_udp')
-from roslib import rostime
+from rospy import rostime
 import rospy
 import actionlib
 import network_monitor_udp.msg as msgs

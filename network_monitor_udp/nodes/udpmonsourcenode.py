@@ -7,7 +7,7 @@ from math import floor
 
 import roslib; roslib.load_manifest('network_monitor_udp')
 import rospy
-from roslib import rostime
+from rospy import rostime
 
 import actionlib
 import sys

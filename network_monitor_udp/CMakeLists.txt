@@ -6,6 +6,9 @@ project(network_monitor_udp)
 # TODO: remove all from COMPONENTS that are not catkin packages.
 find_package(catkin REQUIRED COMPONENTS roscpp rospy diagnostic_msgs actionlib_msgs actionlib message_generation)
 
+# include python modules
+catkin_python_setup()
+
 # include_directories(include ${Boost_INCLUDE_DIR} ${catkin_INCLUDE_DIRS})
 # CATKIN_MIGRATION: removed during catkin migration
 # cmake_minimum_required(VERSION 2.4.6)
@@ -60,3 +63,13 @@ target_link_libraries(udpmonserv ${catkin_LIBRARIES})
 target_link_libraries(udpmonsink ${catkin_LIBRARIES})
 add_dependencies(udpmonsink ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 add_dependencies(udpmonserv ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+
+install(TARGETS udpmonserv udpmonsink
+    RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+)
+catkin_install_python(PROGRAMS nodes/network_watchdog.py nodes/sample_bwtest.py nodes/udpmonclinode.py nodes/udpmonsourcenode.py
+    DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
+
+install(FILES launch_nodes.launch
+    DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
+)
