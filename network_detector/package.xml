@@ -1,6 +1,6 @@
 <package>
   <name>network_detector</name>
-  <version>1.0.15</version>
+  <version>1.0.16</version>
   <description>A ROS node that watches a given network interface and publishes
      whether it is both UP and RUNNING (indicating that a cable is
      plugged into it and communication is happening, for instance) or

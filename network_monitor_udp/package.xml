@@ -1,6 +1,6 @@
 <package>
   <name>network_monitor_udp</name>
-  <version>1.0.15</version>
+  <version>1.0.16</version>
   <description>Facilities to monitor a network connection by sending UDP packets from
     a client to a server, which bounces them back to the client. The client
     collects statistics on latency and loss. The server is a C standalone utility

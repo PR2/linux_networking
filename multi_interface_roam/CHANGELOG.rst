@@ -2,8 +2,8 @@
 Changelog for package multi_interface_roam
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Forthcoming
------------
+1.0.16 (2019-11-08)
+-------------------
 * Merge pull request `#4 <https://github.com/pr2/linux_networking/issues/4>`_ from k-okada/add_travis
   update travis.yml
 * rm *.pyc

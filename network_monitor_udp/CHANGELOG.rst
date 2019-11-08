@@ -2,8 +2,8 @@
 Changelog for package network_monitor_udp
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Forthcoming
------------
+1.0.16 (2019-11-08)
+-------------------
 * ROS-melodic .debs for network_monitor_udp incomplete (`#3 <https://github.com/pr2/linux_networking/issues/3>`_)
   * update melodic-devel to include appropriate files
   - python modules were missing (needed setup.py and `catkin_python_setup`) from .deb
